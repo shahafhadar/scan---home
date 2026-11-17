@@ -117,12 +117,12 @@ export function Setup() {
           <li
             key={label}
             aria-current={i === state.step ? "step" : undefined}
-            className={`h-1.5 flex-1 rounded-full ${i <= state.step ? "bg-green-700" : "bg-foreground/15"}`}
+            className={`h-1.5 flex-1 rounded-full ${i <= state.step ? "bg-accent" : "bg-border"}`}
             title={label}
           />
         ))}
       </ol>
-      <p className="text-sm opacity-60 mb-1">
+      <p className="text-sm text-muted mb-1">
         שלב {state.step + 1} מתוך {STEPS.length}
       </p>
 
@@ -146,7 +146,7 @@ export function Setup() {
             הדונגל לא עובד אם מחברים אותו אליו ישירות.
           </p>
           <p className="font-medium mt-2">שקע USB-A נקבה ללוח:</p>
-          <pre dir="ltr" className="text-xs leading-5 bg-foreground/5 rounded-lg p-3 overflow-x-auto">
+          <pre dir="ltr" className="text-xs leading-5 bg-background rounded-lg p-3 overflow-x-auto">
 {`USB-A          DevKitC-1
 VBUS (red)  →  5V
 D-  (white) →  GPIO19
@@ -156,7 +156,7 @@ GND (black) →  GND
 buzzer +    →  GPIO21
 buzzer -    →  GND`}
           </pre>
-          <p className="text-sm opacity-70">בלי הלחמה: מפצל OTG עם הזנת חשמל לשקע ה־USB, והדונגל מקבל ממנו 5V.</p>
+          <p className="text-sm text-muted">בלי הלחמה: מפצל OTG עם הזנת חשמל לשקע ה־USB, והדונגל מקבל ממנו 5V.</p>
           <Next onClick={() => go({ step: 2 })} />
           <Back onClick={() => go({ step: 0 })} />
         </Card>
@@ -184,7 +184,7 @@ buzzer -    →  GND`}
               <div dir="ltr" className="text-4xl font-mono tracking-[0.3em] text-center my-4">
                 {state.token.token}
               </div>
-              <p className="text-sm opacity-60 text-center">
+              <p className="text-sm text-muted text-center">
                 בתוקף עד{" "}
                 {new Date(state.token.expires_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}. כדאי
                 לזכור אותו או לצלם מסך.
@@ -192,7 +192,7 @@ buzzer -    →  GND`}
               <Next onClick={() => go({ step: 4 })} />
             </>
           ) : (
-            <button onClick={newCode} className="w-full rounded-xl bg-foreground text-background py-3 mt-3 font-medium">
+            <button onClick={newCode} className="w-full rounded-xl bg-accent text-accent-foreground py-3 mt-3 font-medium">
               {expired ? "הקוד פג, ליצור חדש" : "ליצור קוד"}
             </button>
           )}
@@ -219,23 +219,23 @@ buzzer -    →  GND`}
             </li>
             <li>חוזרים לרשת הבית ולעמוד הזה.</li>
           </ol>
-          <div className="rounded-lg bg-foreground/5 p-3 mt-4 text-center" aria-live="polite">
+          <div className="rounded-lg bg-background p-3 mt-4 text-center" aria-live="polite">
             {device ? (
               <>
-                <p className="text-green-700 font-bold text-lg">המכשיר מחובר ✓</p>
-                <p className="text-sm opacity-70">{device.name ?? device.serial}</p>
+                <p className="text-accent font-bold text-lg">המכשיר מחובר ✓</p>
+                <p className="text-sm text-muted">{device.name ?? device.serial}</p>
                 {device.scanner_attached === false && (
-                  <p className="text-sm text-amber-600 mt-1">הלוח לא רואה את הסורק. בדקו את הדונגל ואת ה־5V לשקע.</p>
+                  <p className="text-sm text-warn mt-1">הלוח לא רואה את הסורק. בדקו את הדונגל ואת ה־5V לשקע.</p>
                 )}
               </>
             ) : (
-              <p className="opacity-70">מחכים שהסורק יתחבר… (עד דקה אחרי ששלחתם את הטופס)</p>
+              <p className="text-muted">מחכים שהסורק יתחבר… (עד דקה אחרי ששלחתם את הטופס)</p>
             )}
           </div>
           {device ? (
             <Next onClick={() => go({ step: 5, scanSince: new Date().toISOString() })} />
           ) : (
-            <p className="text-sm opacity-60 mt-3">
+            <p className="text-sm text-muted mt-3">
               הסורק מציג קוד משלו? אפשר להקליד אותו ב<Link href="/devices" className="underline">עמוד המכשירים</Link>.
             </p>
           )}
@@ -246,46 +246,46 @@ buzzer -    →  GND`}
       {state.step === 5 && (
         <Card title="סריקת בדיקה">
           <p>סורקים מוצר כלשהו מהמטבח.</p>
-          <div className="rounded-lg bg-foreground/5 p-4 mt-4 text-center" aria-live="polite">
+          <div className="rounded-lg bg-background p-4 mt-4 text-center" aria-live="polite">
             {scan ? (
               <>
-                <p className="text-green-700 font-bold text-lg">קיבלתי ✓</p>
+                <p className="text-accent font-bold text-lg">קיבלתי ✓</p>
                 <p>{scan.name}</p>
-                <p dir="ltr" className="text-xs opacity-60">
+                <p dir="ltr" className="text-xs text-muted">
                   {scan.barcode}
                 </p>
               </>
             ) : (
-              <p className="opacity-70">מחכים לסריקה…</p>
+              <p className="text-muted">מחכים לסריקה…</p>
             )}
           </div>
           {scan && (
             <Link
               href="/"
               onClick={finish}
-              className="block text-center w-full rounded-xl bg-foreground text-background py-3 mt-4 font-medium"
+              className="block text-center w-full rounded-xl bg-accent text-accent-foreground py-3 mt-4 font-medium"
             >
               לרשימה
             </Link>
           )}
           {!scan && (
-            <p className="text-sm opacity-60 mt-3">
+            <p className="text-sm text-muted mt-3">
               לא מגיע? בעמוד המכשירים רואים אם הלוח מחובר ואם הוא רואה את הסורק.
             </p>
           )}
-          {error && <p className="text-red-600 mt-2">{error}</p>}
+          {error && <p className="text-danger mt-2">{error}</p>}
           <Back onClick={() => go({ step: 4 })} />
         </Card>
       )}
 
-      {error && state.step !== 5 && <p className="text-red-600 mt-2">{error}</p>}
+      {error && state.step !== 5 && <p className="text-danger mt-2">{error}</p>}
     </section>
   );
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border p-4 flex flex-col gap-2">
+    <div className="rounded-2xl bg-surface border p-4 shadow-sm flex flex-col gap-2">
       <h2 className="font-bold text-lg">{title}</h2>
       {children}
     </div>
@@ -294,7 +294,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 function Next({ onClick }: { onClick: () => void }) {
   return (
-    <button onClick={onClick} className="w-full rounded-xl bg-foreground text-background py-3 mt-3 font-medium">
+    <button onClick={onClick} className="w-full rounded-xl bg-accent text-accent-foreground py-3 mt-3 font-medium">
       הבא
     </button>
   );
@@ -302,7 +302,7 @@ function Next({ onClick }: { onClick: () => void }) {
 
 function Back({ onClick }: { onClick: () => void }) {
   return (
-    <button onClick={onClick} className="w-full py-2 text-sm opacity-70">
+    <button onClick={onClick} className="w-full py-2 text-sm text-muted">
       חזרה
     </button>
   );

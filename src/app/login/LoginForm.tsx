@@ -4,7 +4,7 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error" | "limited">("idle");
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -13,7 +13,9 @@ export function LoginForm() {
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
-    setState(error ? "error" : "sent");
+    // 429: the mail provider's hourly cap. Saying so beats "try again",
+    // which only spends another attempt against the same cap.
+    setState(!error ? "sent" : error.status === 429 ? "limited" : "error");
   };
 
   // The sign-in link only works in the browser that asked for it (PKCE).
@@ -23,7 +25,7 @@ export function LoginForm() {
     return (
       <div className="flex flex-col gap-2">
         <p>שלחנו קישור ל־{email}.</p>
-        <p className="text-sm opacity-70">
+        <p className="text-sm text-muted">
           פתחו אותו באותו דפדפן שבו אתם עכשיו. בטלפון: לחיצה ארוכה על הקישור במייל ← פתיחה ב־Safari או ב־Chrome.
         </p>
       </div>
@@ -40,12 +42,15 @@ export function LoginForm() {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="you@example.com"
-        className="border rounded-xl px-3 py-3 bg-transparent"
+        className="border rounded-xl px-3 py-3 bg-background focus:outline-2 focus:outline-accent"
       />
-      <button disabled={state === "sending"} className="rounded-xl bg-foreground text-background py-3 font-medium">
+      <button disabled={state === "sending"} className="rounded-xl bg-accent text-accent-foreground py-3 font-medium disabled:opacity-60">
         {state === "sending" ? "שולח…" : "שלחו לי קישור"}
       </button>
-      {state === "error" && <p className="text-red-600">השליחה נכשלה. נסו שוב בעוד רגע.</p>}
+      {state === "error" && <p className="text-danger text-sm">השליחה נכשלה. נסו שוב בעוד רגע.</p>}
+      {state === "limited" && (
+        <p className="text-danger text-sm">נשלחו יותר מדי קישורים בזמן קצר. נסו שוב בעוד כמה דקות, או השתמשו בקישור שכבר הגיע.</p>
+      )}
     </form>
   );
 }
