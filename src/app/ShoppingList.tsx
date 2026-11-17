@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { SendListButton } from "./SendListButton";
@@ -35,6 +36,8 @@ export function ShoppingList() {
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [live, setLive] = useState(false);
+  // null until we know; a first-time visitor with no scanner gets a welcome, not just an empty list.
+  const [hasScanner, setHasScanner] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     const { data: lists, error: listError } = await supabase
@@ -55,6 +58,8 @@ export function ShoppingList() {
       .neq("status", "removed");
     if (itemsError) setError("טעינת הרשימה נכשלה");
     else setItems(data as Item[]);
+    const { count } = await supabase.from("devices").select("id", { count: "exact", head: true });
+    setHasScanner((count ?? 0) > 0);
   }, [supabase]);
 
   useEffect(() => {
@@ -163,17 +168,36 @@ export function ShoppingList() {
         </div>
       </form>
 
-      {pending.length === 0 && (
+      {pending.length === 0 && hasScanner === false && (
+        <div className="rounded-2xl bg-surface border p-6 shadow-sm">
+          <h2 className="text-lg font-bold">ברוכים הבאים ל־scan home</h2>
+          <p className="text-muted mt-1">הרשימה הזאת מתמלאת מעצמה. ככה זה עובד:</p>
+          <ol className="mt-4 flex flex-col gap-3">
+            {[
+              "מחברים את הסורק פעם אחת. זה לוקח כחמש דקות.",
+              "כשמשהו נגמר בבית, סורקים אותו.",
+              "הוא מופיע כאן ברשימה מיד, גם בטלפון של כל מי שבבית.",
+            ].map((text, i) => (
+              <li key={text} className="flex items-start gap-3">
+                <span className="size-7 shrink-0 grid place-items-center rounded-full bg-accent-soft text-accent font-bold text-sm">{i + 1}</span>
+                <span className="pt-0.5">{text}</span>
+              </li>
+            ))}
+          </ol>
+          <Link href="/setup" className="block text-center rounded-xl bg-accent text-accent-foreground py-3 mt-5 font-medium">
+            בואו נחבר את הסורק
+          </Link>
+          <p className="text-sm text-muted text-center mt-3">אפשר גם להוסיף מוצרים ידנית, בשורת ההוספה.</p>
+        </div>
+      )}
+      {pending.length === 0 && hasScanner !== false && (
         <div className="rounded-2xl bg-surface border p-8 text-center shadow-sm">
           <div className="text-4xl mb-2" aria-hidden="true">🛒</div>
           <p className="font-medium">הרשימה ריקה</p>
           <p className="text-sm text-muted mt-1">סורקים מוצר שנגמר, והוא מופיע כאן.</p>
-          <a href="/setup" className="inline-block mt-4 text-sm text-accent font-medium">
-            עוד אין סורק? להגדרת סורק חדש ←
-          </a>
         </div>
       )}
-      <ul className="rounded-2xl bg-surface border shadow-sm divide-y overflow-hidden">
+      <ul className={`rounded-2xl bg-surface border shadow-sm divide-y overflow-hidden ${pending.length === 0 ? "hidden" : ""}`}>
         {pending.map((item) => (
           <li key={item.id} className="flex items-center gap-3 min-h-16 px-3 py-2">
             <label className="p-2 -m-2">

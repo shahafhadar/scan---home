@@ -2,9 +2,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { firstScanSince, pairedSince, STEPS, type DeviceRow, type ScanRow, type Step } from "./progress";
+import { firstScanSince, migrateStep, pairedSince, STEPS, type DeviceRow, type ScanRow, type Step } from "./progress";
 
-type Saved = { step: Step; token: { token: string; expires_at: string } | null; since: string | null; scanSince: string | null };
+type Saved = {
+  v: 2;
+  step: Step;
+  token: { token: string; expires_at: string } | null;
+  since: string | null;
+  scanSince: string | null;
+};
 
 // The phone leaves this page to join the scanner's own WiFi and comes back
 // later, sometimes to a reloaded tab. Where the person was must survive that.
@@ -12,7 +18,9 @@ const KEY = "scan-home-setup";
 const restore = (): Saved | null => {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Saved) : null;
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as Partial<Saved>;
+    return { v: 2, step: migrateStep(saved), token: saved.token ?? null, since: saved.since ?? null, scanSince: saved.scanSince ?? null };
   } catch {
     return null;
   }
@@ -27,7 +35,7 @@ const persist = (saved: Saved) => {
 
 export function Setup() {
   const supabase = supabaseBrowser();
-  const [state, setState] = useState<Saved>({ step: 0, token: null, since: null, scanSince: null });
+  const [state, setState] = useState<Saved>({ v: 2, step: 0, token: null, since: null, scanSince: null });
   const [device, setDevice] = useState<DeviceRow | null>(null);
   const [scan, setScan] = useState<{ barcode: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,9 +64,9 @@ export function Setup() {
     go({ token: data[0], since: new Date().toISOString() });
   };
 
-  // Step 4: wait for the board to come back paired.
+  // Step 3: wait for the scanner to come back connected.
   useEffect(() => {
-    if (state.step !== 4 || !state.since) return;
+    if (state.step !== 3 || !state.since) return;
     let stopped = false;
     const poll = async () => {
       const { data } = await supabase
@@ -75,9 +83,9 @@ export function Setup() {
     };
   }, [supabase, state.step, state.since]);
 
-  // Step 5: wait for the first scan to land on the list.
+  // Step 4: wait for the first scan to land on the list.
   useEffect(() => {
-    if (state.step !== 5 || !state.scanSince) return;
+    if (state.step !== 4 || !state.scanSince) return;
     let stopped = false;
     const poll = async () => {
       const { data } = await supabase
@@ -111,7 +119,7 @@ export function Setup() {
 
   return (
     <section className="pb-8">
-      <h1 className="text-xl font-bold mb-1">הגדרת סורק</h1>
+      <h1 className="text-xl font-bold mb-1">מחברים את הסורק</h1>
       <ol className="flex gap-1 mb-6" aria-label="שלבים">
         {STEPS.map((label, i) => (
           <li
@@ -122,131 +130,132 @@ export function Setup() {
           />
         ))}
       </ol>
-      <p className="text-sm text-muted mb-1">
+      <p className="text-sm text-muted mb-2">
         שלב {state.step + 1} מתוך {STEPS.length}
       </p>
 
       {state.step === 0 && (
-        <Card title="מה צריך">
-          <ul className="list-disc ps-5 flex flex-col gap-1.5">
-            <li>לוח ESP32-S3-DevKitC-1</li>
-            <li>סורק ברקודים עם דונגל אלחוטי (2.4GHz)</li>
-            <li>שקע USB-A נקבה מחווט ללוח, או מפצל OTG עם הזנת חשמל</li>
-            <li>מטען USB רגיל (5V) וכבל USB-C</li>
-            <li>WiFi ביתי ב־2.4GHz והסיסמה שלו</li>
+        <Card title="בואו נחבר את הסורק">
+          <p>זה לוקח בערך חמש דקות, ועושים את זה פעם אחת בלבד.</p>
+          <p className="font-medium mt-2">מה נעשה:</p>
+          <ol className="list-decimal ps-5 flex flex-col gap-1">
+            <li>נחבר את הסורק לחשמל.</li>
+            <li>נחבר אותו לאינטרנט של הבית.</li>
+            <li>נסרוק מוצר, ונראה אותו ברשימה.</li>
+          </ol>
+          <p className="font-medium mt-2">מה כדאי שיהיה בהישג יד:</p>
+          <ul className="list-disc ps-5 flex flex-col gap-1">
+            <li>הסורק והקופסה שלו</li>
+            <li>מטען רגיל של טלפון עם כבל USB־C</li>
+            <li>הטלפון הזה</li>
+            <li>הסיסמה של ה־WiFi בבית</li>
           </ul>
-          <Next onClick={() => go({ step: 1 })} />
+          <p className="text-sm text-muted mt-2">
+            הסורק מתחבר לרשת הביתית הרגילה (2.4GHz). אם הנתב שלכם מציע כמה רשתות, בוחרים את הרגילה.
+          </p>
+          <Next onClick={() => go({ step: 1 })} label="מתחילים" />
+          <p className="text-center text-sm text-muted mt-1">
+            בניתם את הסורק בעצמכם?{" "}
+            <Link href="/setup/build" className="underline">
+              הוראות חיווט
+            </Link>
+          </p>
         </Card>
       )}
 
       {state.step === 1 && (
-        <Card title="חיווט">
-          <p>
-            ללוח שני שקעי USB-C. <b>UART</b> הוא לחשמל (ולצריבה מהמחשב). <b>USB</b> שייך לסורק, אבל הוא לא מוציא 5V, ולכן
-            הדונגל לא עובד אם מחברים אותו אליו ישירות.
-          </p>
-          <p className="font-medium mt-2">שקע USB-A נקבה ללוח:</p>
-          <pre dir="ltr" className="text-xs leading-5 bg-background rounded-lg p-3 overflow-x-auto">
-{`USB-A          DevKitC-1
-VBUS (red)  →  5V
-D-  (white) →  GPIO19
-D+  (green) →  GPIO20
-GND (black) →  GND
-
-buzzer +    →  GPIO21
-buzzer -    →  GND`}
-          </pre>
-          <p className="text-sm text-muted">בלי הלחמה: מפצל OTG עם הזנת חשמל לשקע ה־USB, והדונגל מקבל ממנו 5V.</p>
-          <Next onClick={() => go({ step: 2 })} />
+        <Card title="מחברים לחשמל">
+          <ol className="list-decimal ps-5 flex flex-col gap-2">
+            <li>מכניסים את המקלט הקטן של הסורק לשקע ה־USB שבקופסה.</li>
+            <li>
+              מחברים את המטען לשקע ה־USB־C שכתוב לידו <b dir="ltr">UART</b>. זה השקע של החשמל.
+            </li>
+            <li>אחרי כמה שניות נדלקת נורה קטנה בקופסה. זה סימן שיש חשמל.</li>
+          </ol>
+          <Next onClick={() => go({ step: 2 })} label="הנורה דולקת" />
           <Back onClick={() => go({ step: 0 })} />
         </Card>
       )}
 
       {state.step === 2 && (
-        <Card title="הסורק">
-          <ol className="list-decimal ps-5 flex flex-col gap-2">
-            <li>
-              מגדירים את הסורק למקלדת <b dir="ltr">US</b> (ברקוד הגדרה מהחוברת שלו). בפריסה אחרת הברקודים מגיעים חתוכים.
-            </li>
-            <li>מכניסים את הדונגל לשקע ה־USB-A.</li>
-            <li>מחברים מטען לשקע ה־UART. נורה בלוח נדלקת.</li>
-          </ol>
-          <Next onClick={() => go({ step: 3 })} />
-          <Back onClick={() => go({ step: 1 })} />
-        </Card>
-      )}
-
-      {state.step === 3 && (
-        <Card title="קוד שיוך">
-          <p>הקוד מחבר את הסורק לרשימה שלכם. הוא בתוקף ל־20 דקות ולשימוש אחד.</p>
+        <Card title="הקוד האישי שלכם">
+          <p>הקוד הזה מחבר את הסורק לרשימה שלכם, ורק לשלכם. נקליד אותו בעוד רגע.</p>
           {state.token && !expired ? (
             <>
               <div dir="ltr" className="text-4xl font-mono tracking-[0.3em] text-center my-4">
                 {state.token.token}
               </div>
               <p className="text-sm text-muted text-center">
-                בתוקף עד{" "}
-                {new Date(state.token.expires_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}. כדאי
-                לזכור אותו או לצלם מסך.
+                הקוד תקף עד{" "}
+                {new Date(state.token.expires_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}. אפשר
+                לצלם מסך כדי לא לשכוח אותו.
               </p>
-              <Next onClick={() => go({ step: 4 })} />
+              <Next onClick={() => go({ step: 3 })} />
             </>
           ) : (
             <button onClick={newCode} className="w-full rounded-xl bg-accent text-accent-foreground py-3 mt-3 font-medium">
-              {expired ? "הקוד פג, ליצור חדש" : "ליצור קוד"}
+              {expired ? "הקוד פג, ליצור חדש" : "ליצור את הקוד"}
             </button>
           )}
+          <Back onClick={() => go({ step: 1 })} />
+        </Card>
+      )}
+
+      {state.step === 3 && (
+        <Card title="מחברים לאינטרנט של הבית">
+          <ol className="list-decimal ps-5 flex flex-col gap-2">
+            <li>
+              בטלפון נכנסים להגדרות ה־WiFi ובוחרים ברשת <b dir="ltr">ScanCart-XXXX</b>. הסורק יוצר אותה בעצמו.
+            </li>
+            <li>דף יפתח לבד. אם הוא לא נפתח, פותחים את הדפדפן וגולשים לכתובת הזאת:</li>
+          </ol>
+          <p dir="ltr" className="font-mono text-center bg-background rounded-lg py-1.5">
+            192.168.4.1
+          </p>
+          <ol start={3} className="list-decimal ps-5 flex flex-col gap-2">
+            <li>
+              בדף מקלידים את הקוד האישי:{" "}
+              <b dir="ltr" className="font-mono">
+                {state.token?.token ?? "—"}
+              </b>
+            </li>
+            <li>בוחרים את הרשת של הבית, מקלידים את הסיסמה שלה ולוחצים &quot;התחבר&quot;.</li>
+            <li>חוזרים לרשת הרגילה של הבית (שוב בהגדרות ה־WiFi של הטלפון), ומחכים כאן.</li>
+          </ol>
+          <div className="rounded-lg bg-background p-3 mt-3 text-center" aria-live="polite">
+            {device ? (
+              <>
+                <p className="text-accent font-bold text-lg">הסורק מחובר ✓</p>
+                <p className="text-sm text-muted">{device.name ?? device.serial}</p>
+                {device.scanner_attached === false && (
+                  <p className="text-sm text-warn mt-1">הקופסה לא מזהה את הסורק. בדקו שהמקלט הקטן נכנס עד הסוף לשקע.</p>
+                )}
+              </>
+            ) : (
+              <p className="text-muted">מחכים שהסורק יתחבר… זה לוקח עד דקה אחרי ששלחתם את הטופס.</p>
+            )}
+          </div>
+          {device && <Next onClick={() => go({ step: 4, scanSince: new Date().toISOString() })} />}
+          <details className="text-sm mt-3">
+            <summary className="text-muted cursor-pointer">הסורק כבר הוגדר פעם, והרשת ScanCart לא מופיעה?</summary>
+            <p className="mt-2">
+              מחזיקים את הכפתור <b>BOOT</b> שבקופסה 10 שניות, עד שהיא מתאפסת. אחרי כמה שניות הרשת מופיעה, וממשיכים מהסעיף הראשון.
+            </p>
+          </details>
+          <details className="text-sm mt-2">
+            <summary className="text-muted cursor-pointer">הסורק מציג קוד משלו?</summary>
+            <p className="mt-2">
+              אפשר להקליד אותו ב<Link href="/devices" className="underline">עמוד הסורקים</Link>.
+            </p>
+          </details>
           <Back onClick={() => go({ step: 2 })} />
         </Card>
       )}
 
       {state.step === 4 && (
-        <Card title="חיבור ל־WiFi">
-          <ol className="list-decimal ps-5 flex flex-col gap-2">
-            <li>
-              לוח חדש פותח רשת משלו מיד. לוח שכבר הוגדר פעם: מחזיקים את כפתור <b>BOOT</b> עשר שניות עד שהוא מאתחל.
-            </li>
-            <li>
-              בטלפון מתחברים לרשת <b dir="ltr">ScanCart-XXXX</b>. דף ההגדרה נפתח לבד, ואם לא, גולשים ל־
-              <span dir="ltr">192.168.4.1</span>.
-            </li>
-            <li>
-              ב&quot;קוד מהאפליקציה&quot; מקלידים{" "}
-              <b dir="ltr" className="font-mono">
-                {state.token?.token ?? "—"}
-              </b>
-              , בוחרים את רשת הבית, מקלידים סיסמה ולוחצים &quot;התחבר&quot;.
-            </li>
-            <li>חוזרים לרשת הבית ולעמוד הזה.</li>
-          </ol>
-          <div className="rounded-lg bg-background p-3 mt-4 text-center" aria-live="polite">
-            {device ? (
-              <>
-                <p className="text-accent font-bold text-lg">המכשיר מחובר ✓</p>
-                <p className="text-sm text-muted">{device.name ?? device.serial}</p>
-                {device.scanner_attached === false && (
-                  <p className="text-sm text-warn mt-1">הלוח לא רואה את הסורק. בדקו את הדונגל ואת ה־5V לשקע.</p>
-                )}
-              </>
-            ) : (
-              <p className="text-muted">מחכים שהסורק יתחבר… (עד דקה אחרי ששלחתם את הטופס)</p>
-            )}
-          </div>
-          {device ? (
-            <Next onClick={() => go({ step: 5, scanSince: new Date().toISOString() })} />
-          ) : (
-            <p className="text-sm text-muted mt-3">
-              הסורק מציג קוד משלו? אפשר להקליד אותו ב<Link href="/devices" className="underline">עמוד המכשירים</Link>.
-            </p>
-          )}
-          <Back onClick={() => go({ step: 3 })} />
-        </Card>
-      )}
-
-      {state.step === 5 && (
-        <Card title="סריקת בדיקה">
-          <p>סורקים מוצר כלשהו מהמטבח.</p>
-          <div className="rounded-lg bg-background p-4 mt-4 text-center" aria-live="polite">
+        <Card title="סריקה ראשונה">
+          <p>סורקים מוצר כלשהו מהמטבח, ומחכים רגע.</p>
+          <div className="rounded-lg bg-background p-4 mt-3 text-center" aria-live="polite">
             {scan ? (
               <>
                 <p className="text-accent font-bold text-lg">קיבלתי ✓</p>
@@ -265,20 +274,30 @@ buzzer -    →  GND`}
               onClick={finish}
               className="block text-center w-full rounded-xl bg-accent text-accent-foreground py-3 mt-4 font-medium"
             >
-              לרשימה
+              לרשימה שלי
             </Link>
           )}
           {!scan && (
-            <p className="text-sm text-muted mt-3">
-              לא מגיע? בעמוד המכשירים רואים אם הלוח מחובר ואם הוא רואה את הסורק.
-            </p>
+            <details className="text-sm mt-3">
+              <summary className="text-muted cursor-pointer">לא קורה כלום?</summary>
+              <ul className="list-disc ps-5 mt-2 flex flex-col gap-1.5">
+                <li>בודקים שהנורה בקופסה עדיין דולקת.</li>
+                <li>
+                  אם מופיעים תווים חתוכים או מוזרים, הסורק צריך להיות מוגדר למקלדת אנגלית (US). הברקוד להגדרה נמצא בחוברת של
+                  הסורק.
+                </li>
+                <li>
+                  ב<Link href="/devices" className="underline">עמוד הסורקים</Link> רואים אם הקופסה מחוברת ואם היא מזהה את הסורק.
+                </li>
+              </ul>
+            </details>
           )}
           {error && <p className="text-danger mt-2">{error}</p>}
-          <Back onClick={() => go({ step: 4 })} />
+          <Back onClick={() => go({ step: 3 })} />
         </Card>
       )}
 
-      {error && state.step !== 5 && <p className="text-danger mt-2">{error}</p>}
+      {error && state.step !== 4 && <p className="text-danger mt-2">{error}</p>}
     </section>
   );
 }
@@ -292,10 +311,10 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function Next({ onClick }: { onClick: () => void }) {
+function Next({ onClick, label = "הבא" }: { onClick: () => void; label?: string }) {
   return (
     <button onClick={onClick} className="w-full rounded-xl bg-accent text-accent-foreground py-3 mt-3 font-medium">
-      הבא
+      {label}
     </button>
   );
 }

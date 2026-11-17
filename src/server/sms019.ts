@@ -19,10 +19,14 @@ export class SmsError extends Error {
   }
 }
 
+// A value pasted into a dashboard often brings a space or a line break along;
+// 019 compares the username and token exactly, so trim them.
+const env = (name: string) => process.env[name]?.trim() || undefined;
+
 const config = () => {
-  const username = process.env.SMS019_USERNAME;
-  const token = process.env.SMS019_TOKEN;
-  const source = process.env.SMS019_SOURCE;
+  const username = env("SMS019_USERNAME");
+  const token = env("SMS019_TOKEN");
+  const source = env("SMS019_SOURCE");
   return username && token && source ? { username, token, source } : null;
 };
 

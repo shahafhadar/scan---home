@@ -38,6 +38,17 @@ describe("sendSms", () => {
     });
   });
 
+  it("ignores spaces and line breaks pasted around the settings", async () => {
+    vi.stubEnv("SMS019_USERNAME", " acme\n");
+    vi.stubEnv("SMS019_TOKEN", "secret-token \n");
+    vi.stubEnv("SMS019_SOURCE", "ScanHome ");
+    const fetchMock = reply({ status: 0, shipment_id: "7" });
+    await sendSms("+972501234567", "hello", fetchMock);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>).authorization).toBe("Bearer secret-token");
+    expect(JSON.parse(init.body as string).sms).toMatchObject({ user: { username: "acme" }, source: "ScanHome" });
+  });
+
   it("explains a refusal without leaking the number or the text", async () => {
     configure();
     const error = await sendSms("+972501234567", "code 123456", reply({ status: 515, message: "Unverified source" })).catch(
