@@ -29,6 +29,8 @@ scans are deduplicated by `scan_id`.
 | `POST /api/v1/devices/heartbeat` | telemetry, see below | `{ok, claimed, command}` – `command` is handed over exactly once |
 | `POST /api/v1/devices/diagnostics` | any JSON object ≤16 KB | `{ok}` |
 
+Every reply carries `Content-Length`; the firmware refuses a body without one.
+
 Heartbeat fields (all optional): `fw, rssi, scanner_attached, keys_seen, uptime,
 reset_reason, boot_count, safe_mode, failed_boots, ota_probation, hw, self_test,
 free_heap, min_heap, queue_size, queue_failed, queue_dropped, errors,

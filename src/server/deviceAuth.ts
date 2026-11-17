@@ -64,4 +64,15 @@ export const authenticateDevice = async (request: Request, rawBody: string): Pro
   return { ok: true, device };
 };
 
-export const json = (body: unknown, status = 200): Response => Response.json(body, { status });
+/**
+ * Every device response declares its length. The firmware refuses to read a
+ * body without Content-Length (it bounds what it reads before allocating), and
+ * Vercel streams a plain Response.json() as chunked.
+ */
+export const json = (body: unknown, status = 200): Response => {
+  const text = JSON.stringify(body);
+  return new Response(text, {
+    status,
+    headers: { "content-type": "application/json", "content-length": String(Buffer.byteLength(text)) },
+  });
+};
