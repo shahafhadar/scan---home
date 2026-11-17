@@ -1,5 +1,5 @@
 import { NotConfigured } from "@/components/NotConfigured";
-import { Nav } from "@/components/Nav";
+import { AppShell } from "@/components/AppShell";
 import { requireUser } from "@/lib/requireUser";
 import { Devices } from "./Devices";
 
@@ -9,9 +9,8 @@ export default async function DevicesPage() {
   const user = await requireUser();
   if (!user) return <NotConfigured />;
   return (
-    <main className="mx-auto max-w-lg px-4 safe-top safe-bottom">
-      <Nav current="devices" />
+    <AppShell current="devices">
       <Devices />
-    </main>
+    </AppShell>
   );
 }

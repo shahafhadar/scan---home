@@ -8,14 +8,14 @@ const RESEND_AFTER_SECONDS = 30;
 const CODE_LENGTH = 6;
 
 type Step = "phone" | "code";
-type Problem = "number" | "send" | "limited" | "wrong-code" | null;
+type Problem = "number" | "send" | "limited" | "wrong-code" | "unavailable" | null;
 
 /**
  * Sign in with an Israeli mobile number: type the number, get a text, type the
  * six digits. Supabase makes and checks the code; the text goes out through 019
  * (see /api/auth/send-sms).
  */
-export function PhoneLogin({ onUnavailable }: { onUnavailable: () => void }) {
+export function PhoneLogin() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("phone");
   const [input, setInput] = useState("");
@@ -44,10 +44,11 @@ export function PhoneLogin({ onUnavailable }: { onUnavailable: () => void }) {
       setWait(RESEND_AFTER_SECONDS);
       return;
     }
-    // Phone sign-in is not switched on in Supabase (yet): offer the email way
-    // instead of a dead end.
+    // Phone sign-in is not switched on in Supabase (yet). Say so, instead of
+    // quietly showing a different form: the person typed a number and expects
+    // a code screen.
     if (error.code === "phone_provider_disabled" || /unsupported phone provider/i.test(error.message)) {
-      onUnavailable();
+      setProblem("unavailable");
       return;
     }
     setProblem(error.status === 429 ? "limited" : "send");
@@ -164,6 +165,9 @@ export function PhoneLogin({ onUnavailable }: { onUnavailable: () => void }) {
         {busy ? "שולח…" : "שלחו לי קוד"}
       </button>
       {problem === "number" && <p className="text-danger text-sm">המספר לא נראה תקין. נייד ישראלי, למשל 050-123-4567.</p>}
+      {problem === "unavailable" && (
+        <p className="rounded-xl bg-background border p-3 text-sm">כניסה עם טלפון עוד לא פעילה במערכת הזאת. אפשר להיכנס עם מייל, בקישור שמתחת.</p>
+      )}
       {problem === "send" && <p className="text-danger text-sm">השליחה נכשלה. נסו שוב בעוד רגע.</p>}
       {problem === "limited" && <p className="text-danger text-sm">נשלחו יותר מדי הודעות. נסו שוב בעוד כמה דקות.</p>}
     </form>
