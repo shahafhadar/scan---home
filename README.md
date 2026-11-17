@@ -15,7 +15,7 @@ npm run build
 
 ## CI/CD
 
-- **CI** (`.github/workflows/ci.yml`) runs on every pull request and every push to `main`:
+- **CI** (`.github/workflows/ci.yml`) runs on every pull request and every push to `main` or `develop`:
   install → lint → typecheck → test → build.
 - **CD** is handled by Vercel's Git integration (`develop` = Development, `main` = Production):
   - every pull request gets a Preview deployment with its own URL;
