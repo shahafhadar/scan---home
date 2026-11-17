@@ -29,16 +29,21 @@ export const setupTestDb = async (name: string): Promise<void> => {
   const dbName = `scanhome_test_${name}_${process.pid}`;
   await admin.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`);
   await admin.query(`CREATE DATABASE ${dbName}`);
-  await admin.end();
+  // Roles are cluster wide, and test files run in parallel, so only one file
+  // at a time may run the shim. Advisory locks belong to a database, so the
+  // lock is taken here, on the admin database every file shares.
+  await admin.query("SELECT pg_advisory_lock(424242)");
 
   const url = new URL(TEST_DATABASE_URL!);
   url.pathname = `/${dbName}`;
   const client = new pg.Client({ connectionString: url.toString() });
   await client.connect();
-  // Roles are cluster wide, so two files may create them at once.
-  await client.query("SELECT pg_advisory_lock(424242)");
-  await client.query(readFileSync(path.join(root, "supabase/test/supabase-shim.sql"), "utf8"));
-  await client.query("SELECT pg_advisory_unlock(424242)");
+  try {
+    await client.query(readFileSync(path.join(root, "supabase/test/supabase-shim.sql"), "utf8"));
+  } finally {
+    await admin.query("SELECT pg_advisory_unlock(424242)");
+    await admin.end();
+  }
   const dir = path.join(root, "supabase/migrations");
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
     await client.query(readFileSync(path.join(dir, file), "utf8"));
