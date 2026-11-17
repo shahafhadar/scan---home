@@ -1,6 +1,11 @@
 # scan-home
 
-Next.js MVP, deployed on Vercel.
+A home grocery scanner: a barcode scanner plugged into an ESP32 "brain" sends
+each scan to this server, and the shopping list updates live in the web app.
+
+- **Web app and device API**: Next.js on Vercel.
+- **Database, sign-in, live updates**: Supabase. Setup: [`docs/supabase.md`](docs/supabase.md).
+- **Device protocol**: [`docs/device-protocol.md`](docs/device-protocol.md), compatible with the prototype firmware.
 
 ## Local development
 
@@ -9,8 +14,9 @@ npm ci
 npm run dev        # http://localhost:3000
 npm run lint
 npm run typecheck
-npm test
+npm test           # database tests need TEST_DATABASE_URL (see .env.example), otherwise skipped
 npm run build
+npm run fake-device -- burst   # a pretend scanner against SCAN_HOME_URL
 ```
 
 ## CI/CD
