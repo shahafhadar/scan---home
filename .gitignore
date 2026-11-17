@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+!.env.example
+
+# fake device identity
+.fake-device.json
+
+# firmware: per-machine server address and bypass key, build output
+/firmware/src/local_config.h
+/firmware/src/local_config.h.bak
+/firmware/.pio/
+/firmware/.venv-pio/
+/firmware/.test-build/

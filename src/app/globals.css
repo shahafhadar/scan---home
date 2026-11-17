@@ -1,26 +1,79 @@
 @import "tailwindcss";
 
+/* One palette, light and dark. Green is the brand: it is the colour of
+   "got it" on the scanner's LED and of a ticked-off item. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light dark;
+  --background: #f5f6f3;
+  --foreground: #1a1c19;
+  --surface: #ffffff;
+  --muted: #6b6f68;
+  --border: #e3e5df;
+  --accent: #166534;
+  --accent-soft: #dcfce7;
+  --accent-foreground: #ffffff;
+  --warn: #b45309;
+  --danger: #b91c1c;
+  /* Height of the bottom tab bar on a phone. */
+  --tabbar-h: 3.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0e100e;
+    --foreground: #ecefe9;
+    --surface: #181b18;
+    --muted: #9aa096;
+    --border: #2a2e29;
+    --accent: #4ade80;
+    --accent-soft: #14301f;
+    --accent-foreground: #0b1a10;
+    --warn: #fbbf24;
+    --danger: #f87171;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+}
+
+* {
+  border-color: var(--border);
+}
+
+/* Installed to the home screen, the app runs edge to edge. */
+.safe-top {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+.safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* No grey flash on every tap, no double-tap zoom on buttons. */
+button,
+a,
+label,
+input[type="checkbox"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Native checkboxes follow the palette instead of staying white in dark mode. */
+input[type="checkbox"] {
+  accent-color: var(--accent);
 }
