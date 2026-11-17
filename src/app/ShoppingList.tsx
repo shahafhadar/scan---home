@@ -128,34 +128,41 @@ export function ShoppingList() {
   return (
     <section className="pb-28">
       <header className="flex items-baseline gap-2 mb-4">
-        <h1 className="text-xl font-bold">{list?.name ?? "רשימת קניות"}</h1>
-        {pending.length > 0 && <span className="text-sm opacity-60">{pending.length} פריטים</span>}
-        <span className={`text-xs ms-auto ${live ? "text-green-700" : "opacity-50"}`}>{live ? "● מחובר" : "○ לא מחובר"}</span>
+        <h1 className="text-2xl font-bold">{list?.name ?? "רשימת קניות"}</h1>
+        {pending.length > 0 && <span className="text-sm text-muted">{pending.length} פריטים</span>}
+        <span
+          className={`text-xs ms-auto rounded-full px-2 py-0.5 ${live ? "bg-accent-soft text-accent" : "bg-border text-muted"}`}
+          title={live ? "סריקות מופיעות כאן מיד" : "מתחבר מחדש…"}
+        >
+          {live ? "● חי" : "○ מתחבר"}
+        </span>
       </header>
 
       {error && (
-        <button className="mb-3 w-full text-start text-red-600" onClick={() => setError(null)}>
+        <button className="mb-3 w-full text-start text-danger text-sm rounded-xl bg-surface border p-3" onClick={() => setError(null)}>
           {error}
         </button>
       )}
 
       {pending.length === 0 && (
-        <div className="py-10 text-center">
-          <p className="opacity-60">הרשימה ריקה. סרקו משהו!</p>
-          <a href="/setup" className="inline-block mt-3 text-sm underline opacity-80">
-            עוד אין סורק? להגדרת סורק חדש
+        <div className="rounded-2xl bg-surface border p-8 text-center shadow-sm">
+          <div className="text-4xl mb-2" aria-hidden="true">🛒</div>
+          <p className="font-medium">הרשימה ריקה</p>
+          <p className="text-sm text-muted mt-1">סורקים מוצר שנגמר, והוא מופיע כאן.</p>
+          <a href="/setup" className="inline-block mt-4 text-sm text-accent font-medium">
+            עוד אין סורק? להגדרת סורק חדש ←
           </a>
         </div>
       )}
-      <ul className="divide-y">
+      <ul className="rounded-2xl bg-surface border shadow-sm divide-y overflow-hidden">
         {pending.map((item) => (
-          <li key={item.id} className="flex items-center gap-3 min-h-14 py-2">
+          <li key={item.id} className="flex items-center gap-3 min-h-16 px-3 py-2">
             <label className="p-2 -m-2">
               <input
                 type="checkbox"
                 aria-label={`נקנה: ${item.name}`}
                 onChange={() => update(item, { status: "purchased" })}
-                className="size-6 accent-green-700"
+                className="size-6 accent-[var(--accent)] rounded-full"
               />
             </label>
             <div className="flex-1 min-w-0">
@@ -168,37 +175,37 @@ export function ShoppingList() {
                     onBlur={() => !nameDraft.trim() && setNaming(null)}
                     placeholder="שם המוצר"
                     enterKeyHint="done"
-                    className="flex-1 min-w-0 border rounded-lg px-2 py-1.5 bg-transparent"
+                    className="flex-1 min-w-0 border rounded-lg px-2 py-1.5 bg-background"
                   />
-                  <button className="rounded-lg bg-foreground text-background px-3">שמירה</button>
+                  <button className="rounded-lg bg-accent text-accent-foreground px-3">שמירה</button>
                 </form>
               ) : (
                 <>
-                  <div className={`truncate ${item.identified ? "" : "opacity-70"}`}>{item.name}</div>
+                  <div className={`truncate font-medium ${item.identified ? "" : "text-muted"}`}>{item.name}</div>
                   {!item.identified && (
                     <button
                       onClick={() => {
                         setNameDraft("");
                         setNaming(item.id);
                       }}
-                      className="text-sm underline opacity-80 py-1"
+                      className="text-xs text-accent font-medium py-1"
                     >
-                      לתת שם למוצר
+                      + לתת שם למוצר
                     </button>
                   )}
                 </>
               )}
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 rounded-full bg-background p-1">
               <button
                 aria-label="פחות"
                 onClick={() => (item.quantity > 1 ? update(item, { quantity: item.quantity - 1 }) : update(item, { status: "removed" }))}
-                className="size-10 rounded-full border text-lg"
+                className="size-9 rounded-full bg-surface border text-lg"
               >
                 −
               </button>
-              <span className="w-6 text-center tabular-nums">{item.quantity}</span>
-              <button aria-label="עוד" onClick={() => update(item, { quantity: item.quantity + 1 })} className="size-10 rounded-full border text-lg">
+              <span className="w-6 text-center tabular-nums font-medium">{item.quantity}</span>
+              <button aria-label="עוד" onClick={() => update(item, { quantity: item.quantity + 1 })} className="size-9 rounded-full bg-surface border text-lg">
                 +
               </button>
             </div>
@@ -208,17 +215,17 @@ export function ShoppingList() {
 
       {purchased.length > 0 && (
         <details className="mt-6">
-          <summary className="opacity-70 py-2">נקנו ({purchased.length})</summary>
-          <ul className="divide-y mt-2">
+          <summary className="text-muted py-2 cursor-pointer">נקנו ({purchased.length})</summary>
+          <ul className="rounded-2xl bg-surface border divide-y overflow-hidden mt-2">
             {purchased.map((item) => (
-              <li key={item.id} className="flex items-center gap-3 min-h-12 py-2 opacity-60">
+              <li key={item.id} className="flex items-center gap-3 min-h-12 px-3 py-2 text-muted">
                 <label className="p-2 -m-2">
                   <input
                     type="checkbox"
                     checked
                     aria-label={`להחזיר לרשימה: ${item.name}`}
                     onChange={() => update(item, { status: "pending" })}
-                    className="size-6 accent-green-700"
+                    className="size-6 accent-[var(--accent)]"
                   />
                 </label>
                 <span className="line-through flex-1 truncate">{item.name}</span>
@@ -232,7 +239,7 @@ export function ShoppingList() {
       {/* Adding by hand sits at the bottom, where a thumb reaches in a shop. */}
       <form
         onSubmit={add}
-        className="fixed inset-x-0 bottom-0 z-10 border-t bg-background/95 backdrop-blur safe-bottom pt-3"
+        className="fixed inset-x-0 bottom-0 z-10 border-t bg-surface/95 backdrop-blur safe-bottom pt-3"
       >
         <div className="mx-auto max-w-lg px-4 flex gap-2">
           <input
@@ -240,9 +247,9 @@ export function ShoppingList() {
             onChange={(e) => setNewName(e.target.value)}
             placeholder="להוסיף ידנית, למשל עגבניות"
             enterKeyHint="send"
-            className="flex-1 min-w-0 border rounded-xl px-3 py-3 bg-transparent"
+            className="flex-1 min-w-0 border rounded-xl px-3 py-3 bg-background"
           />
-          <button className="rounded-xl bg-foreground text-background px-5">הוספה</button>
+          <button className="rounded-xl bg-accent text-accent-foreground px-5 font-medium">הוספה</button>
         </div>
       </form>
     </section>

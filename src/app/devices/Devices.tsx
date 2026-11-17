@@ -82,12 +82,12 @@ export function Devices() {
 
   return (
     <section className="flex flex-col gap-6">
-      <div className="rounded-xl border p-4">
+      <div className="rounded-2xl bg-surface border p-4 shadow-sm">
         <h2 className="font-bold mb-1">הוספת מכשיר</h2>
-        <Link href="/setup" className="block text-center rounded-xl bg-foreground text-background py-3 my-3 font-medium">
+        <Link href="/setup" className="block text-center rounded-xl bg-accent text-accent-foreground py-3 my-3 font-medium">
           הגדרה צעד אחר צעד
         </Link>
-        <p className="text-sm opacity-70 mb-3">
+        <p className="text-sm text-muted mb-3">
           חברו את הטלפון לרשת של הסורק (ScanCart-…), ובעמוד ההגדרה שנפתח הקלידו את הקוד הזה יחד עם פרטי ה־WiFi של הבית.
         </p>
         {token ? (
@@ -95,7 +95,7 @@ export function Devices() {
             <div dir="ltr" className="text-3xl font-mono tracking-[0.3em] text-center my-2">
               {token.token}
             </div>
-            <p className="text-xs opacity-60 text-center">
+            <p className="text-xs text-muted text-center">
               בתוקף עד {new Date(token.expires_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}, לשימוש
               אחד
             </p>
@@ -106,14 +106,14 @@ export function Devices() {
           </button>
         )}
         <details className="mt-3 text-sm">
-          <summary className="opacity-70">הסורק מציג קוד משלו?</summary>
+          <summary className="text-muted">הסורק מציג קוד משלו?</summary>
           <form onSubmit={claimByCode} className="flex gap-2 mt-2">
             <input
               dir="ltr"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="ABC234"
-              className="flex-1 border rounded-lg px-3 py-1.5 bg-transparent font-mono"
+              className="flex-1 border rounded-lg px-3 py-1.5 bg-background font-mono"
             />
             <button className="rounded-lg border px-3">שיוך</button>
           </form>
@@ -123,21 +123,21 @@ export function Devices() {
 
       <div>
         <h2 className="font-bold mb-2">המכשירים שלי</h2>
-        {devices.length === 0 && <p className="opacity-60">עוד אין מכשירים.</p>}
+        {devices.length === 0 && <p className="text-muted">עוד אין מכשירים.</p>}
         <ul className="flex flex-col gap-3">
           {devices.map((d) => {
             const online = isOnline(d.last_seen_at);
             return (
-              <li key={d.id} className="rounded-xl border p-3">
+              <li key={d.id} className="rounded-2xl bg-surface border p-3 shadow-sm">
                 <div className="flex items-baseline gap-2">
-                  <span className={online ? "text-green-600" : "text-red-600"}>●</span>
+                  <span className={online ? "text-accent" : "text-danger"}>●</span>
                   <span className="font-medium">{d.name ?? d.serial}</span>
-                  <span className="text-xs opacity-60 ms-auto">נראה {ago(d.last_seen_at)}</span>
+                  <span className="text-xs text-muted ms-auto">נראה {ago(d.last_seen_at)}</span>
                 </div>
                 {online && d.scanner_attached === false && (
-                  <p className="text-sm text-amber-600 mt-1">המכשיר לא רואה את הסורק. בדקו שהדונגל מחובר.</p>
+                  <p className="text-sm text-warn mt-1">המכשיר לא רואה את הסורק. בדקו שהדונגל מחובר.</p>
                 )}
-                {d.safe_mode && <p className="text-sm text-red-600 mt-1">המכשיר במצב בטוח אחרי אתחולים כושלים.</p>}
+                {d.safe_mode && <p className="text-sm text-danger mt-1">המכשיר במצב בטוח אחרי אתחולים כושלים.</p>}
                 <dl className="grid grid-cols-3 gap-x-3 gap-y-1 text-xs mt-2 opacity-80">
                   <Stat label="גרסה" value={d.firmware_version} />
                   <Stat label="WiFi" value={d.last_rssi !== null ? `${d.last_rssi} dBm` : null} />
@@ -164,7 +164,7 @@ export function Devices() {
 function Stat({ label, value }: { label: string; value: string | number | null }) {
   return (
     <div>
-      <dt className="opacity-60">{label}</dt>
+      <dt className="text-muted">{label}</dt>
       <dd dir="ltr" className="text-end">
         {value ?? "–"}
       </dd>
