@@ -48,4 +48,5 @@ new code. Scans made before pairing are kept and replayed into the list.
 ```bash
 SCAN_HOME_URL=https://<preview-url> npm run fake-device -- register <CODE_FROM_APP>
 SCAN_HOME_URL=https://<preview-url> npm run fake-device -- burst
+# preview behind Vercel deployment protection: add VERCEL_BYPASS=<Protection Bypass for Automation secret>
 ```
