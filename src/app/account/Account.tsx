@@ -1,10 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { smsEnabled } from "@/lib/features";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { supabaseBrowser } from "@/lib/supabase/client";
-
-const smsLogin = process.env.NEXT_PUBLIC_SMS_LOGIN === "true";
 
 export function Account({ email, phone }: { email: string | null; phone: string | null }) {
   const router = useRouter();
@@ -28,7 +27,7 @@ export function Account({ email, phone }: { email: string | null; phone: string 
             </p>
           </div>
         )}
-        {smsLogin && <PhoneSection initial={phone} />}
+        {smsEnabled && <PhoneSection initial={phone} />}
       </div>
 
       <button onClick={signOut} className="rounded-xl border py-3 font-medium">

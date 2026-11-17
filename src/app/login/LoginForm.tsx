@@ -1,18 +1,15 @@
 "use client";
 import { useState } from "react";
+import { smsEnabled } from "@/lib/features";
 import { EmailLogin } from "./EmailLogin";
 import { PhoneLogin } from "./PhoneLogin";
-
-// Inlined at build time. Off until the SMS provider and the Supabase hook are
-// set up, so the screen never offers a way in that cannot work yet.
-const smsLogin = process.env.NEXT_PUBLIC_SMS_LOGIN === "true";
 
 const EMAIL_INTRO = "כניסה עם קישור שנשלח למייל, בלי סיסמה.";
 const PHONE_INTRO = "כניסה עם קוד שנשלח אליך ב־SMS, בלי סיסמה.";
 
 export function LoginForm() {
-  const [mode, setMode] = useState<"phone" | "email">(smsLogin ? "phone" : "email");
-  if (!smsLogin) {
+  const [mode, setMode] = useState<"phone" | "email">(smsEnabled ? "phone" : "email");
+  if (!smsEnabled) {
     return (
       <>
         <p className="text-sm text-muted mb-4">{EMAIL_INTRO}</p>
