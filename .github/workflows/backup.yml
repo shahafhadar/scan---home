@@ -1,0 +1,34 @@
+name: Backup
+
+# Weekly full git bundle (all branches and tags), kept as a workflow artifact for 90 days.
+on:
+  schedule:
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create git bundle
+        run: |
+          git fetch --tags origin '+refs/heads/*:refs/remotes/origin/*'
+          for b in $(git branch -r | grep -v HEAD | sed 's#origin/##'); do
+            git branch -f "$b" "origin/$b" 2>/dev/null || true
+          done
+          git bundle create "scan-home-$(date -u +%Y-%m-%d).bundle" --all
+          git bundle verify scan-home-*.bundle
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: git-bundle
+          path: scan-home-*.bundle
+          retention-days: 90
