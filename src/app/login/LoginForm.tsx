@@ -1,10 +1,17 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
+type State = "idle" | "sending" | "sent" | "error" | "limited";
+
 export function LoginForm() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "sending" | "sent" | "error" | "limited">("idle");
+  const [state, setState] = useState<State>("idle");
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [badCode, setBadCode] = useState(false);
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -18,17 +25,58 @@ export function LoginForm() {
     setState(!error ? "sent" : error.status === 429 ? "limited" : "error");
   };
 
-  // The sign-in link only works in the browser that asked for it (PKCE).
-  // On a phone that means opening it from the mail app in this same browser,
-  // not in the mail app's own built-in viewer.
+  // The code in the email signs in right here, in this tab. No redirect, so
+  // it does not matter which browser or mail app the email is opened in.
+  const verify = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setVerifying(true);
+    setBadCode(false);
+    const { error } = await supabaseBrowser().auth.verifyOtp({ email, token: code, type: "email" });
+    setVerifying(false);
+    if (error) {
+      setBadCode(true);
+      return;
+    }
+    router.replace("/");
+    router.refresh();
+  };
+
   if (state === "sent")
     return (
-      <div className="flex flex-col gap-2">
-        <p>שלחנו קישור ל־{email}.</p>
-        <p className="text-sm text-muted">
-          פתחו אותו באותו דפדפן שבו אתם עכשיו. בטלפון: לחיצה ארוכה על הקישור במייל ← פתיחה ב־Safari או ב־Chrome.
+      <form onSubmit={verify} className="flex flex-col gap-3">
+        <p>
+          שלחנו מייל ל־<span dir="ltr">{email}</span>.
         </p>
-      </div>
+        <p className="text-sm text-muted">מקלידים כאן את הקוד מהמייל, או לוחצים על הקישור שבו.</p>
+        <input
+          required
+          autoFocus
+          autoComplete="one-time-code"
+          inputMode="numeric"
+          pattern="[0-9]{6,8}"
+          maxLength={8}
+          dir="ltr"
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+          placeholder="123456"
+          className="border rounded-xl px-3 py-3 bg-background text-center text-2xl tracking-[0.4em] font-mono focus:outline-2 focus:outline-accent"
+        />
+        <button disabled={verifying || code.length < 6} className="rounded-xl bg-accent text-accent-foreground py-3 font-medium disabled:opacity-60">
+          {verifying ? "בודק…" : "כניסה"}
+        </button>
+        {badCode && <p className="text-danger text-sm">הקוד לא נכון או שפג תוקפו.</p>}
+        <button
+          type="button"
+          onClick={() => {
+            setState("idle");
+            setCode("");
+            setBadCode(false);
+          }}
+          className="text-sm text-muted py-1"
+        >
+          לשלוח שוב או לכתובת אחרת
+        </button>
+      </form>
     );
 
   return (
@@ -45,11 +93,11 @@ export function LoginForm() {
         className="border rounded-xl px-3 py-3 bg-background focus:outline-2 focus:outline-accent"
       />
       <button disabled={state === "sending"} className="rounded-xl bg-accent text-accent-foreground py-3 font-medium disabled:opacity-60">
-        {state === "sending" ? "שולח…" : "שלחו לי קישור"}
+        {state === "sending" ? "שולח…" : "שלחו לי קוד כניסה"}
       </button>
       {state === "error" && <p className="text-danger text-sm">השליחה נכשלה. נסו שוב בעוד רגע.</p>}
       {state === "limited" && (
-        <p className="text-danger text-sm">נשלחו יותר מדי קישורים בזמן קצר. נסו שוב בעוד כמה דקות, או השתמשו בקישור שכבר הגיע.</p>
+        <p className="text-danger text-sm">נשלחו יותר מדי מיילים בזמן קצר. נסו שוב בעוד כמה דקות, או השתמשו בקוד שכבר הגיע.</p>
       )}
     </form>
   );

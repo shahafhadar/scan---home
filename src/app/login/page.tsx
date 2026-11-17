@@ -16,7 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <p className="text-muted mt-1">סורקים בבית, והרשימה מתמלאת לבד.</p>
       </div>
       <div className="rounded-2xl bg-surface border p-5 shadow-sm">
-        <p className="text-sm text-muted mb-4">כניסה עם קישור שנשלח למייל, בלי סיסמה.</p>
+        <p className="text-sm text-muted mb-4">כניסה עם קוד שנשלח למייל, בלי סיסמה.</p>
         {error && <p className="mb-4 text-danger text-sm">הקישור לא תקין או שפג תוקפו. אפשר לבקש קישור חדש.</p>}
         <LoginForm />
       </div>
