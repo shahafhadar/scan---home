@@ -127,7 +127,7 @@ export function ShoppingList() {
   const purchased = useMemo(() => sorted(items.filter((i) => i.status === "purchased")), [items]);
 
   return (
-    <section className="pb-28">
+    <section className="pb-20 md:pb-0">
       <header className="flex items-baseline gap-2 mb-4">
         <h1 className="text-2xl font-bold">{list?.name ?? "רשימת קניות"}</h1>
         {pending.length > 0 && <span className="text-sm text-muted">{pending.length} פריטים</span>}
@@ -144,6 +144,24 @@ export function ShoppingList() {
           {error}
         </button>
       )}
+
+      {/* Adding by hand: on a phone it sits above the tab bar, where a thumb
+          reaches in a shop; on a computer it is simply the first line of the list. */}
+      <form
+        onSubmit={add}
+        className="fixed inset-x-0 bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom))] z-10 border-t bg-surface/95 backdrop-blur py-3 md:static md:z-auto md:border-0 md:bg-transparent md:backdrop-blur-none md:py-0 md:mb-4"
+      >
+        <div className="mx-auto max-w-lg md:max-w-none px-4 md:px-0 flex gap-2">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="להוסיף ידנית, למשל עגבניות"
+            enterKeyHint="send"
+            className="flex-1 min-w-0 border rounded-xl px-3 py-3 bg-background md:bg-surface focus:outline-2 focus:outline-accent"
+          />
+          <button className="rounded-xl bg-accent text-accent-foreground px-5 font-medium">הוספה</button>
+        </div>
+      </form>
 
       {pending.length === 0 && (
         <div className="rounded-2xl bg-surface border p-8 text-center shadow-sm">
@@ -238,23 +256,6 @@ export function ShoppingList() {
           </ul>
         </details>
       )}
-
-      {/* Adding by hand sits at the bottom, where a thumb reaches in a shop. */}
-      <form
-        onSubmit={add}
-        className="fixed inset-x-0 bottom-0 z-10 border-t bg-surface/95 backdrop-blur safe-bottom pt-3"
-      >
-        <div className="mx-auto max-w-lg px-4 flex gap-2">
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="להוסיף ידנית, למשל עגבניות"
-            enterKeyHint="send"
-            className="flex-1 min-w-0 border rounded-xl px-3 py-3 bg-background"
-          />
-          <button className="rounded-xl bg-accent text-accent-foreground px-5 font-medium">הוספה</button>
-        </div>
-      </form>
     </section>
   );
 }

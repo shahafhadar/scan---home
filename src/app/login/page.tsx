@@ -9,13 +9,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (!supabaseConfig()) return <NotConfigured />;
   const { error } = await searchParams;
   return (
-    <main className="mx-auto max-w-sm px-5 safe-top safe-bottom pt-16">
+    <main className="mx-auto max-w-sm md:max-w-md px-5 pt-[max(4rem,env(safe-area-inset-top))] md:pt-28 pb-[max(2rem,env(safe-area-inset-bottom))]">
       <div className="flex flex-col items-center text-center mb-8">
         <Logo size={64} />
         <h1 className="text-2xl font-bold mt-4">scan home</h1>
         <p className="text-muted mt-1">סורקים בבית, והרשימה מתמלאת לבד.</p>
       </div>
-      <div className="rounded-2xl bg-surface border p-5 shadow-sm">
+      <div className="rounded-2xl bg-surface border p-5 md:p-7 shadow-sm">
         {error && <p className="mb-4 text-danger text-sm">הקישור לא תקין או שפג תוקפו. אפשר לבקש קישור חדש.</p>}
         <LoginForm />
       </div>

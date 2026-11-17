@@ -15,14 +15,14 @@ export function Account({ email, phone }: { email: string | null; phone: string 
   };
 
   return (
-    <section className="flex flex-col gap-4 pb-8">
+    <section className="flex flex-col gap-4 md:max-w-lg">
       <h1 className="text-xl font-bold">החשבון שלי</h1>
 
       <div className="rounded-2xl bg-surface border p-4 shadow-sm flex flex-col gap-3">
         {email && (
           <div>
             <p className="text-sm text-muted">מייל</p>
-            <p dir="ltr" className="text-start">
+            <p dir="ltr" className="text-end">
               {email}
             </p>
           </div>
