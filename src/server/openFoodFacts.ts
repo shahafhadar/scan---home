@@ -21,7 +21,11 @@ export const lookupOnline = async (barcode: string): Promise<string | null> => {
     `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json` +
     `?fields=product_name,product_name_he,brands`;
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(4000),
+      // Open Food Facts asks every client to name itself.
+      headers: { "user-agent": "ScanHome/0.1 (home grocery scanner)" },
+    });
     if (!response.ok) return null;
     const body = (await response.json()) as {
       product?: { product_name?: string; product_name_he?: string; brands?: string };
