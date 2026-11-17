@@ -91,7 +91,7 @@ generic failure, so the screen does not rely on the hook's wording.
 | Enter pressed twice, double tap | one request (`busy` guard, and one verify at a time) |
 | Code requested again within a minute | goes to the code box: the earlier code still works. The countdown uses the wait Supabase reports |
 | Code pasted as `123 456`, with Arabic digits, or autofilled | read as the six digits (no `maxLength` on the box) |
-| Wrong or expired code | box cleared and refocused; Supabase reports both as `otp_expired` (403), so the message covers both. After 5 wrong codes the box waits for a new code (UX only: the real limits are Supabase's verify limits and the short expiry) |
+| Wrong or expired code | box cleared and refocused. The message covers both a wrong and an expired code (Supabase's docs do not say whether it tells them apart, so any non-network failure is treated as "wrong"). After 5 wrong codes the box waits for a new code (UX only: the real limits are Supabase's verify limits and the short expiry) |
 | Connection drops while checking | the typed code is kept and "כניסה" retries it |
 | Person leaves to read the text and the browser drops the page | the code box is restored from `localStorage` for 10 minutes, with the wait that is left |
 | No text after a minute (a phone that cannot get SMS, no signal, a late gateway) | "sign in with email instead" appears |
