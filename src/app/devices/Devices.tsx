@@ -84,7 +84,7 @@ export function Devices() {
       <div className="rounded-xl border p-4">
         <h2 className="font-bold mb-1">הוספת סורק</h2>
         <p className="text-sm opacity-70 mb-3">
-          חברו את הטלפון לרשת של הסורק (ScanHome-…), ובעמוד ההגדרה שנפתח הקלידו את הקוד הזה יחד עם פרטי ה־WiFi של הבית.
+          חברו את הטלפון לרשת של הסורק (ScanCart-…), ובעמוד ההגדרה שנפתח הקלידו את הקוד הזה יחד עם פרטי ה־WiFi של הבית.
         </p>
         {token ? (
           <div>

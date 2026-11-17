@@ -22,3 +22,20 @@ body {
   color: var(--foreground);
   font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
+
+/* Installed to the home screen, the app runs edge to edge. */
+.safe-top {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+.safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* No grey flash on every tap, no double-tap zoom on buttons. */
+button,
+a,
+label,
+input[type="checkbox"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
