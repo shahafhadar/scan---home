@@ -1,19 +1,27 @@
 # Email sign-in
 
-Sign-in is passwordless. The person types their email, gets one email, and
-can use either part of it:
+Sign-in is passwordless: the person types their email and gets one email.
 
-- **The code**: typed into the login screen in the same tab. No redirect, so
-  it works whatever browser or mail app the email is opened in.
-- **The link**: `/auth/callback?token_hash=…&type=email`, verified on the
-  server, so it also works outside the browser that asked for it.
+The login screen asks Supabase for the email with the **implicit flow**
+(`supabaseMailer()` in `src/lib/supabase/client.ts`). The link in the email then
+carries the session in the URL fragment: `/auth/callback#access_token=…`. The
+server never sees a fragment, so `/auth/callback` passes the browser on to
+`/auth/confirm`, which reads it, stores the session and clears the address bar.
+Because the link needs nothing from the browser that asked for it, it works in
+whatever browser opens it, including a mail app's built-in browser on a phone.
 
-The default Supabase template sends a PKCE link (`?code=…`) and no code. The
-callback still accepts that, but it only works in the browser that asked.
+The earlier PKCE flow did not: it only works in the browser that asked for the
+link, so on a phone the person got "invalid or expired". `/auth/callback` still
+accepts a PKCE `?code=` for that reason, and a `?token_hash=…&type=email` link.
 
-## Supabase settings (per project: scan-home-dev and scan-home-prod)
+**The default Supabase email works as is.** Nothing below is required.
 
-### Authentication → Emails → Magic Link template
+## Optional: a code in the email
+
+The login screen has a "got a code?" box that signs in in the same tab with
+`verifyOtp`. It needs the Magic Link template to include `{{ .Token }}`. Set it
+per project (scan-home-dev and scan-home-prod), in Authentication → Emails →
+Magic Link:
 
 Subject: `קוד הכניסה ל־scan home: {{ .Token }}`
 
@@ -29,10 +37,10 @@ Subject: `קוד הכניסה ל־scan home: {{ .Token }}`
 </div>
 ```
 
+The button uses `?token_hash=…`, which `/auth/callback` verifies on the server.
 `{{ .RedirectTo }}` is the `emailRedirectTo` the app sends
-(`<origin>/auth/callback`), so the same template serves develop, previews and
-production. That origin must be in Authentication → URL Configuration →
-Redirect URLs.
+(`<origin>/auth/callback`), so one template serves develop and production. That
+origin must be in Authentication → URL Configuration → Redirect URLs.
 
 ### Authentication → Emails → SMTP Settings (Resend)
 

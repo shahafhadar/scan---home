@@ -5,12 +5,14 @@ import { supabaseServer } from "@/lib/supabase/server";
 /**
  * Where the sign-in link from the email lands.
  *
- * Two shapes reach here:
- * - `?token_hash=…&type=email`: the link from our own email template. It is
- *   verified on the server, so it works in any browser, including a mail
- *   app's built-in viewer on a phone.
- * - `?code=…`: Supabase's default template (PKCE). It only works in the
- *   browser that asked for the link, because that browser holds the verifier.
+ * Three shapes reach here:
+ * - `#access_token=…` (the default Supabase email, asked for with the implicit
+ *   flow): the session is in the URL fragment, which the server never sees, so
+ *   this sends the browser on to /auth/confirm. A redirect without a fragment of
+ *   its own keeps the one it came with.
+ * - `?token_hash=…&type=email`: a custom email template. Verified on the server.
+ * - `?code=…`: a PKCE link. It only works in the browser that asked for it,
+ *   because that browser holds the verifier.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -26,5 +28,6 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return NextResponse.redirect(new URL("/", url.origin));
   }
+  if (!tokenHash && !code) return NextResponse.redirect(new URL("/auth/confirm", url.origin));
   return NextResponse.redirect(new URL("/login?error=link", url.origin));
 }

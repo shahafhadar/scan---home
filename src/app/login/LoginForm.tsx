@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { supabaseBrowser } from "@/lib/supabase/client";
+import { supabaseBrowser, supabaseMailer } from "@/lib/supabase/client";
 
 type State = "idle" | "sending" | "sent" | "error" | "limited";
 
@@ -16,7 +16,7 @@ export function LoginForm() {
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
     setState("sending");
-    const { error } = await supabaseBrowser().auth.signInWithOtp({
+    const { error } = await supabaseMailer().auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
@@ -43,28 +43,35 @@ export function LoginForm() {
 
   if (state === "sent")
     return (
-      <form onSubmit={verify} className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3">
         <p>
           שלחנו מייל ל־<span dir="ltr">{email}</span>.
         </p>
-        <p className="text-sm text-muted">מקלידים כאן את הקוד מהמייל, או לוחצים על הקישור שבו.</p>
-        <input
-          required
-          autoFocus
-          autoComplete="one-time-code"
-          inputMode="numeric"
-          pattern="[0-9]{6,8}"
-          maxLength={8}
-          dir="ltr"
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-          placeholder="123456"
-          className="border rounded-xl px-3 py-3 bg-background text-center text-2xl tracking-[0.4em] font-mono focus:outline-2 focus:outline-accent"
-        />
-        <button disabled={verifying || code.length < 6} className="rounded-xl bg-accent text-accent-foreground py-3 font-medium disabled:opacity-60">
-          {verifying ? "בודק…" : "כניסה"}
-        </button>
-        {badCode && <p className="text-danger text-sm">הקוד לא נכון או שפג תוקפו.</p>}
+        <p className="text-sm text-muted">פותחים את הקישור שבו, בכל דפדפן. הוא בתוקף לשעה ולשימוש אחד.</p>
+        <details className="rounded-xl bg-background border px-3 py-2">
+          <summary className="text-sm cursor-pointer select-none">יש קוד במייל? אפשר להקליד אותו כאן</summary>
+          <form onSubmit={verify} className="flex flex-col gap-3 mt-3">
+            <input
+              required
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              pattern="[0-9]{6,8}"
+              maxLength={8}
+              dir="ltr"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              placeholder="123456"
+              className="border rounded-xl px-3 py-3 bg-surface text-center text-2xl tracking-[0.4em] font-mono focus:outline-2 focus:outline-accent"
+            />
+            <button
+              disabled={verifying || code.length < 6}
+              className="rounded-xl bg-accent text-accent-foreground py-3 font-medium disabled:opacity-60"
+            >
+              {verifying ? "בודק…" : "כניסה"}
+            </button>
+            {badCode && <p className="text-danger text-sm">הקוד לא נכון או שפג תוקפו.</p>}
+          </form>
+        </details>
         <button
           type="button"
           onClick={() => {
@@ -76,7 +83,7 @@ export function LoginForm() {
         >
           לשלוח שוב או לכתובת אחרת
         </button>
-      </form>
+      </div>
     );
 
   return (
@@ -93,11 +100,11 @@ export function LoginForm() {
         className="border rounded-xl px-3 py-3 bg-background focus:outline-2 focus:outline-accent"
       />
       <button disabled={state === "sending"} className="rounded-xl bg-accent text-accent-foreground py-3 font-medium disabled:opacity-60">
-        {state === "sending" ? "שולח…" : "שלחו לי קוד כניסה"}
+        {state === "sending" ? "שולח…" : "שלחו לי קישור כניסה"}
       </button>
       {state === "error" && <p className="text-danger text-sm">השליחה נכשלה. נסו שוב בעוד רגע.</p>}
       {state === "limited" && (
-        <p className="text-danger text-sm">נשלחו יותר מדי מיילים בזמן קצר. נסו שוב בעוד כמה דקות, או השתמשו בקוד שכבר הגיע.</p>
+        <p className="text-danger text-sm">נשלחו יותר מדי מיילים בזמן קצר. נסו שוב בעוד כמה דקות, או השתמשו בקישור שכבר הגיע.</p>
       )}
     </form>
   );
