@@ -42,7 +42,7 @@ export function LoginForm() {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-muted">{mode === "phone" ? PHONE_INTRO : EMAIL_INTRO}</p>
-      {mode === "phone" ? <PhoneLogin /> : <EmailLogin />}
+      {mode === "phone" ? <PhoneLogin onUseEmail={() => choose("email")} /> : <EmailLogin />}
       <button type="button" onClick={() => choose(mode === "phone" ? "email" : "phone")} className="text-sm text-muted py-1">
         {mode === "phone" ? "כניסה עם מייל במקום" : "כניסה עם מספר טלפון"}
       </button>

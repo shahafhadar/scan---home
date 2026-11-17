@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { toE164 } from "@/lib/phone";
-import { SmsError, sendSms, smsConfigured } from "@/server/sms019";
+import { otpMessage } from "@/server/otpMessage";
+import { SmsError, needsOperator, sendSms, smsConfigured } from "@/server/sms019";
 import { verifyWebhook } from "@/server/webhook";
 
 /**
@@ -49,11 +50,16 @@ export async function POST(request: Request) {
   if (!to) return refuse(400, "רק מספרי נייד ישראליים נתמכים");
 
   try {
-    await sendSms(to, `קוד הכניסה שלך ל־scan home: ${parsed.sms.otp}`);
+    await sendSms(to, otpMessage(parsed.sms.otp));
   } catch (error) {
-    // The message names 019's status, never the number or the code.
-    console.error("send-sms:", error instanceof SmsError ? error.message : "unexpected failure");
-    return refuse(502, "לא הצלחנו לשלוח את ההודעה. נסו שוב בעוד רגע.");
+    // The message names 019's status, never the number or the code. A refusal
+    // only the account owner can fix (credit, credentials, sender name) gets
+    // its own prefix so a log alert can tell it from a one-off timeout.
+    const owner = needsOperator(error);
+    console.error(`send-sms${owner ? " [needs the 019 account owner]" : ""}:`, error instanceof SmsError ? error.message : "unexpected failure");
+    return owner
+      ? refuse(503, "שליחת הודעות לא זמינה כרגע. אפשר להיכנס עם מייל.")
+      : refuse(502, "לא הצלחנו לשלוח את ההודעה. נסו שוב בעוד רגע.");
   }
   return Response.json({});
 }
