@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { SendListButton } from "./SendListButton";
 
 export type Item = {
   id: string;
@@ -212,6 +213,8 @@ export function ShoppingList() {
           </li>
         ))}
       </ul>
+
+      {pending.length > 0 && <SendListButton />}
 
       {purchased.length > 0 && (
         <details className="mt-6">
