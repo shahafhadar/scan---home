@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
@@ -82,9 +83,12 @@ export function Devices() {
   return (
     <section className="flex flex-col gap-6">
       <div className="rounded-xl border p-4">
-        <h2 className="font-bold mb-1">הוספת סורק</h2>
+        <h2 className="font-bold mb-1">הוספת מכשיר</h2>
+        <Link href="/setup" className="block text-center rounded-xl bg-foreground text-background py-3 my-3 font-medium">
+          הגדרה צעד אחר צעד
+        </Link>
         <p className="text-sm opacity-70 mb-3">
-          חברו את הטלפון לרשת של הסורק (ScanHome-…), ובעמוד ההגדרה שנפתח הקלידו את הקוד הזה יחד עם פרטי ה־WiFi של הבית.
+          חברו את הטלפון לרשת של הסורק (ScanCart-…), ובעמוד ההגדרה שנפתח הקלידו את הקוד הזה יחד עם פרטי ה־WiFi של הבית.
         </p>
         {token ? (
           <div>
@@ -97,8 +101,8 @@ export function Devices() {
             </p>
           </div>
         ) : (
-          <button onClick={newToken} className="rounded-lg bg-foreground text-background px-4 py-2">
-            קבלת קוד שיוך
+          <button onClick={newToken} className="rounded-lg border px-4 py-2">
+            רק קוד שיוך
           </button>
         )}
         <details className="mt-3 text-sm">

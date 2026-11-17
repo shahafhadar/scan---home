@@ -9,7 +9,7 @@ export default async function DevicesPage() {
   const user = await requireUser();
   if (!user) return <NotConfigured />;
   return (
-    <main className="mx-auto max-w-lg p-4">
+    <main className="mx-auto max-w-lg px-4 safe-top safe-bottom">
       <Nav current="devices" />
       <Devices />
     </main>

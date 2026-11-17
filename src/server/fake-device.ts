@@ -11,12 +11,15 @@
  *
  * SCAN_HOME_URL picks the server (default http://localhost:3000). The pretend
  * device's identity is kept in .fake-device.json (git-ignored).
+ * VERCEL_BYPASS, when set, is sent as x-vercel-protection-bypass so the pretend
+ * device can reach a preview that sits behind Vercel deployment protection.
  */
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const BASE = process.env.SCAN_HOME_URL ?? "http://localhost:3000";
 const STATE = ".fake-device.json";
+const bypass: Record<string, string> = process.env.VERCEL_BYPASS ? { "x-vercel-protection-bypass": process.env.VERCEL_BYPASS } : {};
 
 type State = { serial: string; secret: string };
 const state: State = existsSync(STATE)
@@ -34,7 +37,7 @@ const call = async (method: string, path: string, body?: unknown, forge = false)
   const signature = createHmac("sha256", forge ? "wrong-key" : secretHash).update(`${timestamp}.${raw}`).digest("hex");
   const response = await fetch(`${BASE}${path}`, {
     method,
-    headers: { "content-type": "application/json", "x-device-id": state.serial, "x-timestamp": timestamp, "x-signature": signature },
+    headers: { ...bypass, "content-type": "application/json", "x-device-id": state.serial, "x-timestamp": timestamp, "x-signature": signature },
     body: method === "GET" ? undefined : raw,
   });
   const text = await response.text();
@@ -56,7 +59,7 @@ switch (command) {
   case "register": {
     const response = await fetch(`${BASE}/api/v1/devices/register`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { ...bypass, "content-type": "application/json" },
       body: JSON.stringify({ serial: state.serial, secret_hash: secretHash, firmware_version: "fake", claim_token: argument }),
     });
     const body = (await response.json()) as { pairing_code?: string; claimed?: boolean; status?: string };

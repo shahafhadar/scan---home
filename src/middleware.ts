@@ -24,5 +24,5 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // Pages only: the device API and static files never carry a session.
-  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico|manifest.webmanifest).*)"],
+  matcher: ["/((?!api/|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/).*)"],
 };

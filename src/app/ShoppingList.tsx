@@ -106,10 +106,18 @@ export function ShoppingList() {
     void load();
   };
 
-  const identify = async (item: Item) => {
-    const name = window.prompt(`איך לקרוא למוצר ${item.barcode}?`, "");
-    if (!name?.trim() || !item.barcode) return;
-    const { error: rpcError } = await supabase.rpc("identify_product", { p_barcode: item.barcode, p_name: name.trim() });
+  // Naming happens inline in the row: window.prompt is clumsy on a phone and
+  // blocked outright in some installed web apps.
+  const [naming, setNaming] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState("");
+
+  const identify = async (event: React.FormEvent, item: Item) => {
+    event.preventDefault();
+    const name = nameDraft.trim();
+    setNaming(null);
+    if (!name || !item.barcode) return;
+    setItems((current) => applyChange(current, { ...item, name, identified: true }, item.list_id));
+    const { error: rpcError } = await supabase.rpc("identify_product", { p_barcode: item.barcode, p_name: name });
     if (rpcError) setError("שמירת השם נכשלה");
     void load();
   };
@@ -118,56 +126,79 @@ export function ShoppingList() {
   const purchased = useMemo(() => sorted(items.filter((i) => i.status === "purchased")), [items]);
 
   return (
-    <section>
+    <section className="pb-28">
       <header className="flex items-baseline gap-2 mb-4">
         <h1 className="text-xl font-bold">{list?.name ?? "רשימת קניות"}</h1>
-        <span className={`text-xs ${live ? "text-green-600" : "opacity-50"}`}>{live ? "● מחובר" : "○ לא מחובר"}</span>
+        {pending.length > 0 && <span className="text-sm opacity-60">{pending.length} פריטים</span>}
+        <span className={`text-xs ms-auto ${live ? "text-green-700" : "opacity-50"}`}>{live ? "● מחובר" : "○ לא מחובר"}</span>
       </header>
 
       {error && (
-        <p className="mb-3 text-red-600" onClick={() => setError(null)}>
+        <button className="mb-3 w-full text-start text-red-600" onClick={() => setError(null)}>
           {error}
-        </p>
+        </button>
       )}
 
-      <form onSubmit={add} className="flex gap-2 mb-4">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="להוסיף ידנית, למשל עגבניות"
-          className="flex-1 border rounded-lg px-3 py-2 bg-transparent"
-        />
-        <button className="rounded-lg bg-foreground text-background px-4">הוספה</button>
-      </form>
-
-      {pending.length === 0 && <p className="opacity-60 py-6 text-center">הרשימה ריקה. סרקו משהו!</p>}
+      {pending.length === 0 && (
+        <div className="py-10 text-center">
+          <p className="opacity-60">הרשימה ריקה. סרקו משהו!</p>
+          <a href="/setup" className="inline-block mt-3 text-sm underline opacity-80">
+            עוד אין סורק? להגדרת סורק חדש
+          </a>
+        </div>
+      )}
       <ul className="divide-y">
         {pending.map((item) => (
-          <li key={item.id} className="flex items-center gap-3 py-2">
-            <input
-              type="checkbox"
-              aria-label={`נקנה: ${item.name}`}
-              onChange={() => update(item, { status: "purchased" })}
-              className="size-5"
-            />
-            <div className="flex-1">
-              <div className={item.identified ? "" : "opacity-70"}>{item.name}</div>
-              {!item.identified && (
-                <button onClick={() => identify(item)} className="text-xs underline opacity-80">
-                  לתת שם למוצר
-                </button>
+          <li key={item.id} className="flex items-center gap-3 min-h-14 py-2">
+            <label className="p-2 -m-2">
+              <input
+                type="checkbox"
+                aria-label={`נקנה: ${item.name}`}
+                onChange={() => update(item, { status: "purchased" })}
+                className="size-6 accent-green-700"
+              />
+            </label>
+            <div className="flex-1 min-w-0">
+              {naming === item.id ? (
+                <form onSubmit={(e) => identify(e, item)} className="flex gap-2">
+                  <input
+                    autoFocus
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onBlur={() => !nameDraft.trim() && setNaming(null)}
+                    placeholder="שם המוצר"
+                    enterKeyHint="done"
+                    className="flex-1 min-w-0 border rounded-lg px-2 py-1.5 bg-transparent"
+                  />
+                  <button className="rounded-lg bg-foreground text-background px-3">שמירה</button>
+                </form>
+              ) : (
+                <>
+                  <div className={`truncate ${item.identified ? "" : "opacity-70"}`}>{item.name}</div>
+                  {!item.identified && (
+                    <button
+                      onClick={() => {
+                        setNameDraft("");
+                        setNaming(item.id);
+                      }}
+                      className="text-sm underline opacity-80 py-1"
+                    >
+                      לתת שם למוצר
+                    </button>
+                  )}
+                </>
               )}
             </div>
             <div className="flex items-center gap-1">
               <button
                 aria-label="פחות"
                 onClick={() => (item.quantity > 1 ? update(item, { quantity: item.quantity - 1 }) : update(item, { status: "removed" }))}
-                className="size-7 rounded-full border"
+                className="size-10 rounded-full border text-lg"
               >
                 −
               </button>
               <span className="w-6 text-center tabular-nums">{item.quantity}</span>
-              <button aria-label="עוד" onClick={() => update(item, { quantity: item.quantity + 1 })} className="size-7 rounded-full border">
+              <button aria-label="עוד" onClick={() => update(item, { quantity: item.quantity + 1 })} className="size-10 rounded-full border text-lg">
                 +
               </button>
             </div>
@@ -177,18 +208,43 @@ export function ShoppingList() {
 
       {purchased.length > 0 && (
         <details className="mt-6">
-          <summary className="opacity-70">נקנו ({purchased.length})</summary>
+          <summary className="opacity-70 py-2">נקנו ({purchased.length})</summary>
           <ul className="divide-y mt-2">
             {purchased.map((item) => (
-              <li key={item.id} className="flex items-center gap-3 py-2 opacity-60">
-                <input type="checkbox" checked onChange={() => update(item, { status: "pending" })} className="size-5" />
-                <span className="line-through flex-1">{item.name}</span>
+              <li key={item.id} className="flex items-center gap-3 min-h-12 py-2 opacity-60">
+                <label className="p-2 -m-2">
+                  <input
+                    type="checkbox"
+                    checked
+                    aria-label={`להחזיר לרשימה: ${item.name}`}
+                    onChange={() => update(item, { status: "pending" })}
+                    className="size-6 accent-green-700"
+                  />
+                </label>
+                <span className="line-through flex-1 truncate">{item.name}</span>
                 <span className="tabular-nums">{item.quantity}</span>
               </li>
             ))}
           </ul>
         </details>
       )}
+
+      {/* Adding by hand sits at the bottom, where a thumb reaches in a shop. */}
+      <form
+        onSubmit={add}
+        className="fixed inset-x-0 bottom-0 z-10 border-t bg-background/95 backdrop-blur safe-bottom pt-3"
+      >
+        <div className="mx-auto max-w-lg px-4 flex gap-2">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="להוסיף ידנית, למשל עגבניות"
+            enterKeyHint="send"
+            className="flex-1 min-w-0 border rounded-xl px-3 py-3 bg-transparent"
+          />
+          <button className="rounded-xl bg-foreground text-background px-5">הוספה</button>
+        </div>
+      </form>
     </section>
   );
 }

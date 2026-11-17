@@ -66,3 +66,37 @@ jobs:
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
+
+  firmware:
+    name: Firmware tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: firmware
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Host tests
+        run: ./run-tests.sh
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('firmware/platformio.ini') }}
+
+      - name: Install PlatformIO
+        run: pip install platformio intelhex
+
+      # The product build, and the shipped build with its guards switched on.
+      # No local_config.h exists here, so production uses the default https host.
+      - name: Build usb
+        run: pio run -e usb
+
+      - name: Build production
+        run: pio run -e production
