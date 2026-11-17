@@ -1,0 +1,17 @@
+import { NotConfigured } from "@/components/NotConfigured";
+import { Nav } from "@/components/Nav";
+import { requireUser } from "@/lib/requireUser";
+import { Devices } from "./Devices";
+
+export const dynamic = "force-dynamic";
+
+export default async function DevicesPage() {
+  const user = await requireUser();
+  if (!user) return <NotConfigured />;
+  return (
+    <main className="mx-auto max-w-lg p-4">
+      <Nav current="devices" />
+      <Devices />
+    </main>
+  );
+}
