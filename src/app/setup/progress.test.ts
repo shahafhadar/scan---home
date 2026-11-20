@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { firstScanSince, pairedSince, type DeviceRow } from "./progress";
+import { firstScanSince, migrateStep, pairedSince, type DeviceRow } from "./progress";
 
 const device = (patch: Partial<DeviceRow>): DeviceRow => ({
   id: "d1",
@@ -52,5 +52,24 @@ describe("firstScanSince", () => {
       { scan_id: "first", barcode: "4", received_at: "2026-11-17T10:00:02.000Z", list_item_id: "i1" },
     ];
     expect(firstScanSince(scans, "2026-11-17T10:00:00.000Z")?.scan_id).toBe("first");
+  });
+});
+
+describe("migrateStep", () => {
+  it("keeps a current save where it was, within the five steps", () => {
+    expect(migrateStep({ v: 2, step: 3 })).toBe(3);
+    expect(migrateStep({ v: 2, step: 9 })).toBe(4);
+    expect(migrateStep({ v: 2, step: -1 })).toBe(0);
+  });
+
+  it("maps an old six-step save onto the matching new step", () => {
+    // needs, wiring, scanner, code, WiFi, test scan
+    expect([0, 1, 2, 3, 4, 5].map((step) => migrateStep({ step }))).toEqual([0, 0, 1, 2, 3, 4]);
+  });
+
+  it("starts over when the save makes no sense", () => {
+    expect(migrateStep({})).toBe(0);
+    expect(migrateStep({ step: 1.5 })).toBe(0);
+    expect(migrateStep({ step: 99 })).toBe(4);
   });
 });

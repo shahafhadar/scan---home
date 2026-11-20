@@ -75,13 +75,41 @@ describe("send SMS hook", () => {
 
   it("reports a gateway failure without leaking the number or the code", async () => {
     const { SmsError } = await import("@/server/sms019");
-    sendSms.mockRejectedValue(new SmsError("019 refused the message (4): out of credit", 4));
+    sendSms.mockRejectedValue(new SmsError("019 refused the message (6): process failure", 6));
     const response = await call(hook());
     expect(response.status).toBe(502);
     const text = JSON.stringify(await response.json());
     expect(text).not.toContain("123456");
     expect(text).not.toContain("501234567");
     expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("123456");
+  });
+
+  it("flags a refusal only the 019 account owner can fix, with another status", async () => {
+    const { SmsError } = await import("@/server/sms019");
+    sendSms.mockRejectedValue(new SmsError("019 refused the message (4): out of credit", 4));
+    const response = await call(hook());
+    expect(response.status).toBe(503);
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).toContain("account owner");
+  });
+
+  it("treats a timeout as passing, not as something to fix", async () => {
+    const { SmsError } = await import("@/server/sms019");
+    sendSms.mockRejectedValue(new SmsError("019 did not answer (TimeoutError)"));
+    const response = await call(hook());
+    expect(response.status).toBe(502);
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("account owner");
+  });
+
+  it("answers every error as JSON, which Supabase requires", async () => {
+    const response = await call(hook(), { signed: false });
+    expect(response.headers.get("content-type")).toContain("application/json");
+  });
+
+  it("puts the site on the last line when one is configured", async () => {
+    vi.stubEnv("OTP_SMS_DOMAIN", "app.example.com");
+    await call(hook());
+    const text = sendSms.mock.calls[0][1] as string;
+    expect(text.split("\n").at(-1)).toBe("@app.example.com #123456");
   });
 
   it("rejects a malformed payload", async () => {

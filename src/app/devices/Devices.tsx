@@ -82,80 +82,113 @@ export function Devices() {
 
   return (
     <section className="flex flex-col gap-6">
-      <div className="rounded-2xl bg-surface border p-4 shadow-sm">
-        <h2 className="font-bold mb-1">הוספת מכשיר</h2>
-        <Link href="/setup" className="block text-center rounded-xl bg-accent text-accent-foreground py-3 my-3 font-medium">
-          הגדרה צעד אחר צעד
-        </Link>
-        <p className="text-sm text-muted mb-3">
-          חברו את הטלפון לרשת של הסורק (ScanCart-…), ובעמוד ההגדרה שנפתח הקלידו את הקוד הזה יחד עם פרטי ה־WiFi של הבית.
-        </p>
-        {token ? (
-          <div>
-            <div dir="ltr" className="text-3xl font-mono tracking-[0.3em] text-center my-2">
-              {token.token}
-            </div>
-            <p className="text-xs text-muted text-center">
-              בתוקף עד {new Date(token.expires_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}, לשימוש
-              אחד
-            </p>
-          </div>
-        ) : (
-          <button onClick={newToken} className="rounded-lg border px-4 py-2">
-            רק קוד שיוך
-          </button>
-        )}
-        <details className="mt-3 text-sm">
-          <summary className="text-muted">הסורק מציג קוד משלו?</summary>
-          <form onSubmit={claimByCode} className="flex gap-2 mt-2">
-            <input
-              dir="ltr"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="ABC234"
-              className="flex-1 border rounded-lg px-3 py-1.5 bg-background font-mono"
-            />
-            <button className="rounded-lg border px-3">שיוך</button>
-          </form>
-        </details>
-        {message && <p className="mt-2 text-sm">{message}</p>}
-      </div>
-
       <div>
-        <h2 className="font-bold mb-2">המכשירים שלי</h2>
-        {devices.length === 0 && <p className="text-muted">עוד אין מכשירים.</p>}
+        <h1 className="text-xl font-bold mb-2">הסורקים שלי</h1>
+        {devices.length === 0 && (
+          <div className="rounded-2xl bg-surface border p-6 text-center shadow-sm">
+            <p className="font-medium">עוד לא חיברתם סורק.</p>
+            <p className="text-sm text-muted mt-1">זה לוקח כחמש דקות, וההדרכה מלווה אתכם בכל צעד.</p>
+          </div>
+        )}
         <ul className="flex flex-col gap-3">
           {devices.map((d) => {
             const online = isOnline(d.last_seen_at);
             return (
-              <li key={d.id} className="rounded-2xl bg-surface border p-3 shadow-sm">
-                <div className="flex items-baseline gap-2">
-                  <span className={online ? "text-accent" : "text-danger"}>●</span>
+              <li key={d.id} className="rounded-2xl bg-surface border p-4 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <span className={online ? "text-accent" : "text-danger"} aria-hidden="true">
+                    ●
+                  </span>
                   <span className="font-medium">{d.name ?? d.serial}</span>
-                  <span className="text-xs text-muted ms-auto">נראה {ago(d.last_seen_at)}</span>
+                  <span className={`text-sm ms-auto ${online ? "text-accent" : "text-muted"}`}>
+                    {online ? "מחובר" : `לא מחובר, נראה ${ago(d.last_seen_at)}`}
+                  </span>
                 </div>
                 {online && d.scanner_attached === false && (
-                  <p className="text-sm text-warn mt-1">המכשיר לא רואה את הסורק. בדקו שהדונגל מחובר.</p>
+                  <p className="text-sm text-warn mt-2">הקופסה לא מזהה את הסורק. בדקו שהמקלט הקטן נכנס עד הסוף.</p>
                 )}
-                {d.safe_mode && <p className="text-sm text-danger mt-1">המכשיר במצב בטוח אחרי אתחולים כושלים.</p>}
-                <dl className="grid grid-cols-3 gap-x-3 gap-y-1 text-xs mt-2 opacity-80">
-                  <Stat label="גרסה" value={d.firmware_version} />
-                  <Stat label="WiFi" value={d.last_rssi !== null ? `${d.last_rssi} dBm` : null} />
-                  <Stat label="סורק" value={d.scanner_attached === null ? null : d.scanner_attached ? "מחובר" : "לא מחובר"} />
-                  <Stat label="תווים מהסורק" value={d.keys_seen} />
-                  <Stat label="בתור" value={d.queue_size} />
-                  <Stat label="זיכרון פנוי" value={d.free_heap !== null ? `${Math.round(d.free_heap / 1024)}KB` : null} />
-                  <Stat label="מינימום זיכרון" value={d.min_heap !== null ? `${Math.round(d.min_heap / 1024)}KB` : null} />
-                  <Stat label="ניתוקי WiFi" value={d.wifi_reconnects} />
-                  <Stat label="אתחולי USB" value={d.usb_restarts} />
-                  <Stat label="שגיאות" value={d.error_count} />
-                  <Stat label="נזרקו מהתור" value={d.queue_dropped} />
-                  <Stat label="אתחול אחרון" value={d.reset_reason} />
-                </dl>
+                {!online && d.last_seen_at && (
+                  <p className="text-sm text-muted mt-2">בדקו שהקופסה מחוברת לחשמל ושרשת ה־WiFi בבית עובדת.</p>
+                )}
+                {d.safe_mode && (
+                  <p className="text-sm text-danger mt-2">הקופסה נתקלה בבעיה והופעלה במצב בטוח. נתקו אותה מהחשמל וחברו מחדש.</p>
+                )}
+                <details className="mt-3 text-sm">
+                  <summary className="text-muted cursor-pointer">פרטים טכניים</summary>
+                  <dl className="grid grid-cols-3 gap-x-3 gap-y-1 text-xs mt-2 opacity-80">
+                    <Stat label="גרסה" value={d.firmware_version} />
+                    <Stat label="WiFi" value={d.last_rssi !== null ? `${d.last_rssi} dBm` : null} />
+                    <Stat label="סורק" value={d.scanner_attached === null ? null : d.scanner_attached ? "מחובר" : "לא מחובר"} />
+                    <Stat label="תווים מהסורק" value={d.keys_seen} />
+                    <Stat label="בתור" value={d.queue_size} />
+                    <Stat label="זיכרון פנוי" value={d.free_heap !== null ? `${Math.round(d.free_heap / 1024)}KB` : null} />
+                    <Stat label="מינימום זיכרון" value={d.min_heap !== null ? `${Math.round(d.min_heap / 1024)}KB` : null} />
+                    <Stat label="ניתוקי WiFi" value={d.wifi_reconnects} />
+                    <Stat label="אתחולי USB" value={d.usb_restarts} />
+                    <Stat label="שגיאות" value={d.error_count} />
+                    <Stat label="נזרקו מהתור" value={d.queue_dropped} />
+                    <Stat label="אתחול אחרון" value={d.reset_reason} />
+                  </dl>
+                </details>
               </li>
             );
           })}
         </ul>
+      </div>
+
+      <div className="rounded-2xl bg-surface border p-4 shadow-sm">
+        <h2 className="font-bold mb-1">{devices.length === 0 ? "חיבור הסורק הראשון" : "להוסיף סורק"}</h2>
+        <p className="text-sm text-muted mb-3">ההדרכה מלווה אתכם צעד אחר צעד, בלי מילים מסובכות.</p>
+        <Link href="/setup" className="block text-center rounded-xl bg-accent text-accent-foreground py-3 font-medium">
+          מתחילים
+        </Link>
+
+        <details className="mt-4 text-sm">
+          <summary className="text-muted cursor-pointer">אפשרויות נוספות</summary>
+          <div className="mt-3 flex flex-col gap-3">
+            <div>
+              <p className="text-muted mb-2">קוד שיוך בלבד, בלי ההדרכה:</p>
+              {token ? (
+                <div>
+                  <div dir="ltr" className="text-3xl font-mono tracking-[0.3em] text-center my-2">
+                    {token.token}
+                  </div>
+                  <p className="text-xs text-muted text-center">
+                    בתוקף עד {new Date(token.expires_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}, לשימוש
+                    אחד
+                  </p>
+                </div>
+              ) : (
+                <button onClick={newToken} className="rounded-lg border px-4 py-2">
+                  ליצור קוד שיוך
+                </button>
+              )}
+            </div>
+            <form onSubmit={claimByCode} className="flex flex-col gap-2">
+              <label className="text-muted" htmlFor="device-code">
+                הסורק מציג קוד משלו? מקלידים אותו כאן:
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="device-code"
+                  dir="ltr"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="ABC234"
+                  className="flex-1 border rounded-lg px-3 py-1.5 bg-background font-mono"
+                />
+                <button className="rounded-lg border px-3">שיוך</button>
+              </div>
+            </form>
+            <p className="text-muted">
+              בניתם את הסורק בעצמכם?{" "}
+              <Link href="/setup/build" className="underline">
+                הוראות חיווט
+              </Link>
+            </p>
+          </div>
+        </details>
+        {message && <p className="mt-3 text-sm">{message}</p>}
       </div>
     </section>
   );

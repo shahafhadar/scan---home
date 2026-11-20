@@ -28,5 +28,17 @@ export const firstScanSince = (scans: ScanRow[], since: string): ScanRow | null 
     .filter((s) => s.received_at >= since && s.list_item_id !== null)
     .sort((a, b) => a.received_at.localeCompare(b.received_at))[0] ?? null;
 
-export const STEPS = ["מה צריך", "חיווט", "הסורק", "קוד שיוך", "חיבור ל־WiFi", "סריקת בדיקה"] as const;
-export type Step = 0 | 1 | 2 | 3 | 4 | 5;
+export const STEPS = ["מתחילים", "חשמל", "קוד אישי", "חיבור ל־WiFi", "סריקה ראשונה"] as const;
+export type Step = 0 | 1 | 2 | 3 | 4;
+
+/**
+ * Where a saved setup should resume. Before the wizard was rewritten in plain
+ * language it had six steps (needs, wiring, scanner, code, WiFi, test scan);
+ * someone who left halfway must land on the matching step, not a wrong one.
+ */
+export const migrateStep = (saved: { v?: number; step?: number }): Step => {
+  const step = Number.isInteger(saved.step) ? (saved.step as number) : 0;
+  if (saved.v === 2) return Math.min(Math.max(step, 0), 4) as Step;
+  const map: Step[] = [0, 0, 1, 2, 3, 4];
+  return map[Math.min(Math.max(step, 0), 5)] ?? 0;
+};
