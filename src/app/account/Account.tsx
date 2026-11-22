@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { smsEnabled } from "@/lib/features";
@@ -29,6 +30,10 @@ export function Account({ email, phone, recentAuth }: { email: string | null; ph
         )}
         {smsEnabled && <PhoneSection initial={phone} />}
       </div>
+
+      <Link href="/household" className="rounded-xl border py-3 font-medium text-center">
+        בני הבית והרשאות
+      </Link>
 
       <a
         href="/api/account/export"
