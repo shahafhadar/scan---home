@@ -85,13 +85,19 @@ export function PhoneLogin() {
     setBusy(true);
     setProblem(null);
     const { error } = await supabaseBrowser().auth.verifyOtp({ phone, token, type: "sms" });
-    verifying.current = false;
-    setBusy(false);
     if (error) {
+      // A fresh attempt is allowed, so release the lock.
+      verifying.current = false;
+      setBusy(false);
       setProblem("wrong-code");
       setCode("");
       return;
     }
+    // Success: the code is now spent and we are navigating away. Keep the lock
+    // on. The screen auto-submits at six digits *and* has a submit button, and
+    // mobile SMS autofill can fire a change moments later -- without this, a
+    // second verify would hit the already-consumed code and show a false
+    // "wrong code" error even though sign-in succeeded.
     router.replace("/");
     router.refresh();
   };

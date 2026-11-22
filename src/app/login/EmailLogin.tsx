@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Turnstile } from "@/components/Turnstile";
 import { turnstileSiteKey } from "@/lib/features";
 import { supabaseBrowser, supabaseMailer } from "@/lib/supabase/client";
@@ -16,6 +16,7 @@ export function EmailLogin() {
   const [badCode, setBadCode] = useState(false);
   const [captcha, setCaptcha] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
+  const verifying_ = useRef(false);
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -40,14 +41,20 @@ export function EmailLogin() {
   // it does not matter which browser or mail app the email is opened in.
   const verify = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (verifying_.current) return;
+    verifying_.current = true;
     setVerifying(true);
     setBadCode(false);
     const { error } = await supabaseBrowser().auth.verifyOtp({ email, token: code, type: "email" });
-    setVerifying(false);
     if (error) {
+      // A fresh attempt is allowed, so release the lock.
+      verifying_.current = false;
+      setVerifying(false);
       setBadCode(true);
       return;
     }
+    // Success: the code is spent and we are navigating away. Keep the lock on
+    // so a second submit cannot re-verify the consumed code.
     router.replace("/");
     router.refresh();
   };
