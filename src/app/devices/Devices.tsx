@@ -143,7 +143,12 @@ export function Devices() {
       </div>
 
       <div>
-        <h2 className="font-bold mb-2">המכשירים שלי</h2>
+        <div className="flex items-baseline justify-between mb-2">
+          <h2 className="font-bold">המכשירים שלי</h2>
+          <Link href="/devices/troubleshooting" className="text-sm text-muted underline">
+            פתרון תקלות
+          </Link>
+        </div>
         {devices.length === 0 && <p className="text-muted">עוד אין מכשירים.</p>}
         <ul className="flex flex-col gap-3">
           {devices.map((d) => {
@@ -152,7 +157,9 @@ export function Devices() {
               <li key={d.id} className="rounded-2xl bg-surface border p-3 shadow-sm">
                 <div className="flex items-baseline gap-2">
                   <span className={online ? "text-accent" : "text-danger"}>●</span>
-                  <span className="font-medium">{d.name ?? d.serial}</span>
+                  <Link href={`/devices/${d.id}`} className="font-medium underline">
+                    {d.name ?? d.serial}
+                  </Link>
                   <span className="text-xs text-muted ms-auto">נראה {ago(d.last_seen_at)}</span>
                 </div>
                 {online && d.scanner_attached === false && (
