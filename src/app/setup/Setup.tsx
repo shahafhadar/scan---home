@@ -103,11 +103,17 @@ export function Setup() {
               <span className="text-sm text-muted">לוח שכבר הוגדר פעם: מחזיקים את כפתור <b>BOOT</b> עשר שניות כדי לאפס.</span>
             </li>
             <li>
-              בטלפון מתחברים לרשת <b dir="ltr">ScanCart-XXXX</b>. דף ההגדרה נפתח לבד (אם לא —{" "}
-              <span dir="ltr">192.168.4.1</span>).
+              בטלפון מתחברים לרשת <b dir="ltr">ScanCart-XXXX</b>, ואז פותחים את דף ההגדרה בכפתור שמתחת.
             </li>
             <li>בוחרים את רשת הבית, מקלידים סיסמה ולוחצים &quot;התחבר&quot;. חוזרים לרשת הבית ולעמוד הזה.</li>
           </ol>
+
+          <a href="http://192.168.4.1" className="block text-center rounded-xl border py-3 mt-3 font-medium">
+            פתח את דף ההגדרה של הסורק
+          </a>
+          <p className="text-xs text-muted mt-1">
+            עובד רק כשאתם מחוברים לרשת <span dir="ltr">ScanCart-XXXX</span>. אם הדף לא נפתח מעצמו — זה הכפתור.
+          </p>
 
           <div className="mt-4">
             <p className="text-sm text-muted mb-2">כשהלוח מתחבר הוא מופיע כאן — טאפ אחד והוא שלכם:</p>
