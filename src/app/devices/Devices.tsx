@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { AdoptPanel } from "./AdoptPanel";
 
 type Device = {
   id: string;
@@ -84,39 +85,58 @@ export function Devices() {
     <section className="flex flex-col gap-6">
       <div className="rounded-2xl bg-surface border p-4 shadow-sm">
         <h2 className="font-bold mb-1">הוספת מכשיר</h2>
-        <Link href="/setup" className="block text-center rounded-xl bg-accent text-accent-foreground py-3 my-3 font-medium">
+        <p className="text-sm text-muted mb-3">
+          חברו את הלוח לרשת הבית דרך עמוד ההגדרה שלו, והוא יופיע כאן אוטומטית. בפעם הראשונה כדאי ללכת לפי ההגדרה המודרכת.
+        </p>
+        <Link
+          href="/setup"
+          className="block text-center rounded-xl bg-accent text-accent-foreground py-3 mb-3 font-medium"
+        >
           הגדרה צעד אחר צעד
         </Link>
-        <p className="text-sm text-muted mb-3">
-          חברו את הטלפון לרשת של הסורק (ScanCart-…), ובעמוד ההגדרה שנפתח הקלידו את הקוד הזה יחד עם פרטי ה־WiFi של הבית.
-        </p>
-        {token ? (
-          <div>
-            <div dir="ltr" className="text-3xl font-mono tracking-[0.3em] text-center my-2">
-              {token.token}
+
+        <AdoptPanel
+          onAdopted={() => {
+            setMessage("המכשיר נוסף");
+            void load();
+          }}
+        />
+
+        <details className="mt-4 text-sm">
+          <summary className="text-muted cursor-pointer select-none">דרכים נוספות (קוד ידני)</summary>
+          <div className="mt-3 flex flex-col gap-4">
+            <div>
+              <p className="text-muted mb-2">ללוח עם קושחה ישנה שמבקשת קוד בעמוד ההגדרה — צרו קוד והקלידו אותו שם:</p>
+              {token ? (
+                <div>
+                  <div dir="ltr" className="text-3xl font-mono tracking-[0.3em] text-center my-2">
+                    {token.token}
+                  </div>
+                  <p className="text-xs text-muted text-center">
+                    בתוקף עד {new Date(token.expires_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })},
+                    לשימוש אחד
+                  </p>
+                </div>
+              ) : (
+                <button onClick={newToken} className="rounded-lg border px-4 py-2">
+                  צור קוד שיוך
+                </button>
+              )}
             </div>
-            <p className="text-xs text-muted text-center">
-              בתוקף עד {new Date(token.expires_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}, לשימוש
-              אחד
-            </p>
+            <div>
+              <p className="text-muted mb-2">הסורק מציג קוד משלו?</p>
+              <form onSubmit={claimByCode} className="flex gap-2">
+                <input
+                  dir="ltr"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="ABC234"
+                  className="flex-1 border rounded-lg px-3 py-1.5 bg-background font-mono"
+                />
+                <button className="rounded-lg border px-3">שיוך</button>
+              </form>
+            </div>
           </div>
-        ) : (
-          <button onClick={newToken} className="rounded-lg border px-4 py-2">
-            רק קוד שיוך
-          </button>
-        )}
-        <details className="mt-3 text-sm">
-          <summary className="text-muted">הסורק מציג קוד משלו?</summary>
-          <form onSubmit={claimByCode} className="flex gap-2 mt-2">
-            <input
-              dir="ltr"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="ABC234"
-              className="flex-1 border rounded-lg px-3 py-1.5 bg-background font-mono"
-            />
-            <button className="rounded-lg border px-3">שיוך</button>
-          </form>
         </details>
         {message && <p className="mt-2 text-sm">{message}</p>}
       </div>
