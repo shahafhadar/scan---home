@@ -5,7 +5,7 @@ import { smsEnabled } from "@/lib/features";
 import { formatPhone, toE164 } from "@/lib/phone";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
-export function Account({ email, phone }: { email: string | null; phone: string | null }) {
+export function Account({ email, phone, recentAuth }: { email: string | null; phone: string | null; recentAuth: boolean }) {
   const router = useRouter();
 
   const signOut = async () => {
@@ -30,10 +30,94 @@ export function Account({ email, phone }: { email: string | null; phone: string 
         {smsEnabled && <PhoneSection initial={phone} />}
       </div>
 
+      <a
+        href="/api/account/export"
+        className="rounded-xl border py-3 font-medium text-center"
+        download="scan-home-export.json"
+      >
+        הורדת הנתונים שלי
+      </a>
+
       <button onClick={signOut} className="rounded-xl border py-3 font-medium">
         יציאה
       </button>
+
+      <DeleteAccount recentAuth={recentAuth} onDeleted={signOut} />
     </section>
+  );
+}
+
+/**
+ * Closing the account. Deliberately a little awkward: the person confirms by
+ * typing a word, and the server also insists on a recent sign-in, so neither a
+ * stray click nor a left-open session can do it.
+ */
+function DeleteAccount({ recentAuth, onDeleted }: { recentAuth: boolean; onDeleted: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const remove = async () => {
+    setBusy(true);
+    setProblem(null);
+    const response = await fetch("/api/account/delete", { method: "POST" });
+    setBusy(false);
+    if (response.ok) {
+      onDeleted();
+      return;
+    }
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    setProblem(
+      body.error === "reauth_required"
+        ? "מטעמי אבטחה צריך כניסה עדכנית. התנתקו, היכנסו שוב, ואז אפשר למחוק."
+        : "המחיקה נכשלה. נסו שוב בעוד רגע.",
+    );
+  };
+
+  if (!open)
+    return (
+      <button onClick={() => setOpen(true)} className="text-sm text-danger py-1 self-start">
+        מחיקת החשבון
+      </button>
+    );
+
+  return (
+    <div className="rounded-2xl border border-danger/40 p-4 flex flex-col gap-3">
+      <p className="font-medium text-danger">מחיקת החשבון</p>
+      <p className="text-sm text-muted">
+        הרשימות, המכשירים וההעדפות שלכם יינעלו ולא תהיה אליהם גישה. לאישור, הקלידו <b>מחיקה</b>.
+      </p>
+      {!recentAuth && (
+        <p className="text-sm text-muted">שימו לב: ייתכן שתתבקשו להיכנס מחדש לפני המחיקה, מטעמי אבטחה.</p>
+      )}
+      <input
+        value={confirm}
+        onChange={(event) => setConfirm(event.target.value)}
+        aria-label="הקלדת האישור"
+        className="border rounded-xl px-3 py-3 bg-background focus:outline-2 focus:outline-danger"
+      />
+      <div className="flex gap-3">
+        <button
+          onClick={remove}
+          disabled={busy || confirm.trim() !== "מחיקה"}
+          className="rounded-xl bg-danger text-white py-3 px-4 font-medium disabled:opacity-50"
+        >
+          {busy ? "מוחק…" : "מחיקה לצמיתות"}
+        </button>
+        <button
+          onClick={() => {
+            setOpen(false);
+            setConfirm("");
+            setProblem(null);
+          }}
+          className="rounded-xl border py-3 px-4"
+        >
+          ביטול
+        </button>
+      </div>
+      {problem && <p className="text-danger text-sm">{problem}</p>}
+    </div>
   );
 }
 
