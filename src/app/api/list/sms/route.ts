@@ -53,6 +53,9 @@ export async function POST() {
   try {
     await sendSms(to, text);
   } catch (failure) {
+    // The send never happened, so give the allowance back -- a provider
+    // failure should not cost the person one of their few texts.
+    await supabase.rpc("release_sms_send");
     // The message names 019's status, never the number or the list.
     console.error("list-sms:", failure instanceof SmsError ? failure.message : "unexpected failure");
     return refuse(502, "send_failed");

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { toE164 } from "@/lib/phone";
+import { clientIp, reserveOtpSend } from "@/server/otpBudget";
 import { SmsError, sendSms, smsConfigured } from "@/server/sms019";
 import { verifyWebhook } from "@/server/webhook";
 
@@ -47,6 +48,12 @@ export async function POST(request: Request) {
   // 019 is an Israeli gateway and only Israeli mobiles can sign in this way.
   const to = toE164(parsed.user.new_phone || parsed.user.phone || "");
   if (!to) return refuse(400, "רק מספרי נייד ישראליים נתמכים");
+
+  // Our own budget on top of Supabase's: stops SMS-pumping and flooding one
+  // number. Inactive until OTP_PEPPER is set; fails open on a database error.
+  if (!(await reserveOtpSend({ identifier: to, ip: clientIp(request), channel: "sms" }))) {
+    return refuse(429, "יותר מדי בקשות לקוד. נסו שוב בעוד כמה דקות.");
+  }
 
   try {
     await sendSms(to, `קוד הכניסה שלך ל־scan home: ${parsed.sms.otp}`);
