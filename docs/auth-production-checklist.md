@@ -30,6 +30,16 @@ working on `develop` — they switch the new protections on and prepare release.
   (or `'active'`, `'disabled'`, `'deleted'`). Every change is recorded in
   `public.security_events`.
 
+## End-to-end tests in CI (optional)
+- [ ] To run the Playwright E2E job on PRs: set repository **variable**
+  `E2E_ENABLED=true`, and **secrets** `E2E_SUPABASE_URL` and
+  `E2E_SUPABASE_ANON_KEY` (the dev project's public URL and anon key). Until
+  then the job is skipped and never reddens CI.
+- [ ] To run the full OTP sign-in specs (not just redirect/render): enable a
+  Supabase **test OTP** (a fixed code for a fixed test identifier) so no real
+  SMS/e-mail goes out, then set `E2E_TEST_OTP` and fill in the gated specs in
+  `e2e/auth.spec.ts`.
+
 ## Retention (decide, then schedule)
 - [ ] `otp_sends` self-prunes after 2 days. `security_events` grows unbounded —
   decide a retention window and add a scheduled delete (pg_cron or a routine).
