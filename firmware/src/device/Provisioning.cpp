@@ -124,14 +124,8 @@ void handleRoot() {
 
   String page = pageHead("הגדרת ScanCart");
   page += "<h1>מחברים את הסורק</h1>";
-  page += "<div class='sub'>שלב אחד, ואז הכל אוטומטי.</div>";
+  page += "<div class='sub'>בוחרים את רשת הבית, וזהו.</div>";
   page += "<form method='POST' action='/save'>";
-  page += "<label>קוד מהאפליקציה</label>";
-  page += "<input name='claim' type='text' inputmode='latin' autocapitalize='characters' "
-          "autocomplete='off' placeholder='ABC123' maxlength='8' "
-          "style='text-align:center;letter-spacing:5px;font-size:22px'>";
-  page += "<p class='hint'>פתח את האפליקציה ← מכשירים ← <b>הוסף מכשיר</b>, והקלד כאן את הקוד "
-          "שמופיע שם. כך הסורק משתייך לחשבון שלך מיד, בלי שלבים נוספים.</p>";
   page += "<label>רשת ה-WiFi הביתית</label>";
   page += "<select name='ssid'>" + networkOptions() + "</select>";
   page += "<label>סיסמת הרשת</label>";
@@ -139,12 +133,11 @@ void handleRoot() {
   page += "<button type='submit'>התחבר</button></form>";
   page += "<p class='hint'>המכשיר תומך ברשתות 2.4GHz בלבד. אם הרשת שלך לא ברשימה, "
           "היא כנראה משדרת ב-5GHz בלבד.</p>";
-  // Shown before submitting, not only after. The phone leaves this network the
-  // moment the device joins the home one, and some phones close the setup
-  // window by themselves -- so the code has to have been on screen already.
-  page += "<p class='hint' style='margin-top:22px'>קוד החיבור שלך, תצטרך אותו בעוד רגע:</p>";
-  page += "<div class='code' style='font-size:26px;letter-spacing:6px;padding:14px'>";
-  page += htmlEscape(DeviceIdentity::pairingCode()) + "</div>";
+  // No code to copy any more: after it connects, the scanner shows up in the
+  // app by itself and is added with one tap. The serial is here so a household
+  // with two devices can tell which one this is.
+  page += "<p class='hint' style='margin-top:18px'>אחרי החיבור פותחים את האפליקציה ← "
+          "<b>מכשירים</b>, והסורק מופיע שם להוספה בלחיצה.</p>";
   page += "<p class='hint'>מספר סידורי: " + htmlEscape(DeviceIdentity::serial()) + "</p>";
   page += "</main></body></html>";
   server.send(200, "text/html; charset=utf-8", page);
@@ -163,9 +156,8 @@ void handleSave() {
   pendingSsid = ssid;
   pendingPassword = server.arg("password");
 
-  claimTokenValue = server.arg("claim");
-  claimTokenValue.trim();
-  claimTokenValue.toUpperCase();
+  // No app code any more: the device registers itself and the app adopts it.
+  claimTokenValue = "";
   submittedAt = millis();
   submitted = true;
   progress = Provisioning::Progress::Connecting;
@@ -178,49 +170,24 @@ void handleSave() {
 }
 
 /**
- * The hand-off page.
+ * The progress page.
  *
- * This is where setup stops on purpose. The phone is about to leave this
- * network -- joining the home network moves the access point to another
- * channel, and phones drop a network with no internet on their own -- so the
- * six characters have to make it off this screen before that happens.
- *
- * Which means the page cannot just display them. It has to get them copied,
- * and it has to refuse to move on until they are. The link to the app stays
- * locked until the code is on the clipboard; a user who taps straight through
- * arrives at the app with nothing to type.
- *
- * navigator.clipboard does not exist here -- this is plain http, so the page
- * is not a secure context. The old execCommand path is the only one available.
+ * The phone is about to leave this network -- joining the home network moves
+ * the access point to another channel, and phones drop a network with no
+ * internet on their own. That is fine now: there is nothing to carry back. The
+ * scanner registers itself and shows up in the app, where it is added with one
+ * tap, so this page can be closed at any moment.
  */
 void handleProgress() {
-  const String code = DeviceIdentity::pairingCode();
-  const bool selfClaiming = claimTokenValue.length() > 0;
-
   String page = pageHead("כמעט סיימנו");
   page += "<h1 id='head'>הפרטים נשמרו</h1>";
   page += "<div class='sub' id='sub'>המכשיר מתחבר עכשיו לרשת הביתית.</div>";
-
-  if (selfClaiming) {
-    // Nothing to carry back. The code already travelled the other way, so this
-    // page can be closed at any moment without costing the user anything.
-    page += "<div class='ok'>הקוד מהאפליקציה התקבל. הסורק ישתייך לחשבון שלך "
-            "אוטומטית ברגע שיתחבר — אפשר לסגור את החלון הזה בכל שלב.</div>";
-  } else {
-    page += "<div class='warn'>לא הזנת קוד מהאפליקציה, אז השיוך יצטרך את הקוד הזה. "
-            "העתק אותו עכשיו — העמוד ייסגר מעצמו כשהטלפון יחזור לרשת הביתית.</div>";
-    page += "<div class='code pick' id='code'>" + htmlEscape(code) + "</div>";
-    page += "<button class='btn copy' id='copy' type='button'>העתק את הקוד</button>";
-    page += "<div id='copied'></div>";
-    page += "<a class='btn locked' id='app' href='" + String(SCANCART_HOST) + "/?code=" +
-            htmlEscape(code) + "'>העתק קודם את הקוד</a>";
-  }
 
   page += "<ol class='steps'>";
   page += "<li id='s1'><span class='dot'></span><span>מתחבר לרשת הביתית</span></li>";
   page += "<li id='s2'><span class='dot'></span><span>מסנכרן שעון</span></li>";
   page += "<li id='s3'><span class='dot'></span><span>מתחבר לשרת</span></li>";
-  page += "<li id='s4'><span class='dot'></span><span>משייך לחשבון שלך</span></li>";
+  page += "<li id='s4'><span class='dot'></span><span>מופיע באפליקציה</span></li>";
   page += "</ol>";
   page += "<div id='panel'></div>";
 
@@ -228,46 +195,7 @@ void handleProgress() {
   page += R"JS(
 var ORDER = {WaitingForInput:0, Connecting:1, WifiFailed:1, SyncingTime:2,
              Registering:3, ServerFailed:3, WaitingToPair:4, Paired:5};
-var lost = 0, copied = false;
-
-function unlock(){
-  copied = true;
-  if (!document.getElementById('app')) return;
-  document.getElementById('copied').innerHTML =
-    "<div class='ok'>הקוד הועתק. עכשיו חזור לרשת ה-WiFi הביתית שלך, ואז לחץ למטה.</div>";
-  var app = document.getElementById('app');
-  app.className = 'btn';
-  app.textContent = 'המשך לאפליקציה';
-}
-
-var copyButton = document.getElementById('copy');
-if (copyButton) copyButton.addEventListener('click', function(){
-  var text = document.getElementById('code').textContent.trim();
-  var el = document.createElement('input');
-  el.value = text;
-  el.setAttribute('readonly', '');
-  el.style.position = 'absolute';
-  el.style.left = '-9999px';
-  document.body.appendChild(el);
-  var ok = false;
-  try {
-    el.select();
-    el.setSelectionRange(0, 99999);   // iOS ignores select() on its own
-    ok = document.execCommand('copy');
-  } catch (e) { ok = false; }
-  document.body.removeChild(el);
-
-  if (ok) {
-    unlock();
-  } else {
-    // Copying can be refused outright. Never trap the user behind it -- show
-    // the code for manual selection and open the gate anyway.
-    document.getElementById('copied').innerHTML =
-      "<div class='warn'>הדפדפן לא איפשר העתקה אוטומטית. סמן את הקוד למעלה והעתק ידנית, " +
-      "או פשוט רשום אותו.</div>";
-    unlock();
-  }
-});
+var lost = 0;
 
 function paint(s){
   lost = 0;
@@ -278,14 +206,6 @@ function paint(s){
     li.className = bad === i ? 'failed' : (at > i ? 'done' : (at === i ? 'active' : ''));
     if (li.className === 'done') li.querySelector('.dot').textContent = '✓';
   }
-  // The server may have issued a different code, if another device had this
-  // one. Only relevant on the fallback page, which is the only one showing it.
-  var codeEl = document.getElementById('code');
-  if (codeEl && s.code && s.code !== codeEl.textContent.trim()) {
-    codeEl.textContent = s.code;
-    var app = document.getElementById('app');
-    if (app) app.href = app.href.replace(/code=[^&]*/, 'code=' + s.code);
-  }
   var panel = document.getElementById('panel');
   if (s.progress === 'WifiFailed') {
     panel.innerHTML = "<div class='err'>לא הצלחתי להתחבר לרשת. כנראה הסיסמה שגויה." +
@@ -294,13 +214,14 @@ function paint(s){
     panel.innerHTML = "<div class='err'>מחובר ל-WiFi אבל לא מצליח להגיע לשרת." +
       (s.detail ? ' (' + s.detail + ')' : '') + "</div>";
   } else if (s.progress === 'WaitingToPair') {
-    document.getElementById('head').textContent = 'ההתחברות הושלמה';
-    document.getElementById('sub').textContent = 'נשאר רק לשייך את המכשיר לחשבון.';
-    panel.innerHTML = '';
+    document.getElementById('head').textContent = 'הסורק מחובר';
+    document.getElementById('sub').textContent = '';
+    panel.innerHTML = "<div class='ok'>פתחו את האפליקציה ← מכשירים, והסורק יופיע שם. " +
+      "לחצו 'זה שלי' כדי להוסיף אותו לחשבון. אפשר לסגור את החלון הזה.</div>";
   } else if (s.progress === 'Paired') {
     document.getElementById('head').textContent = 'המכשיר מוכן';
     document.getElementById('sub').textContent = '';
-    panel.innerHTML = "<div class='ok'>הסורק משויך לחשבון שלך. אפשר לסגור את החלון.</div>";
+    panel.innerHTML = "<div class='ok'>הסורק נוסף לחשבון שלך. אפשר לסגור את החלון.</div>";
   } else {
     panel.innerHTML = '';
   }
@@ -310,10 +231,8 @@ function poll(){
   fetch('/status').then(function(r){ return r.json(); }).then(paint).catch(function(){
     if (++lost === 3) {
       document.getElementById('panel').innerHTML =
-        "<p class='hint'>המכשיר עבר לרשת הביתית והקשר לעמוד הזה נותק — זה תקין ומצופה. " +
-        (document.getElementById('code') === null
-           ? "השיוך נעשה אוטומטית — אין מה לעשות."
-           : (copied ? "הקוד כבר אצלך." : "העתק את הקוד למעלה לפני שאתה סוגר.")) + "</p>";
+        "<p class='hint'>המכשיר עבר לרשת הביתית והקשר לעמוד הזה נותק — זה תקין. " +
+        "פתחו את האפליקציה כדי להוסיף את הסורק.</p>";
     }
   });
 }
