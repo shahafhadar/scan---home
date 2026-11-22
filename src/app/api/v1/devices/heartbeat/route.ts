@@ -30,6 +30,11 @@ const beat = z
     errors: count,
     wifi_reconnects: count,
     usb_restarts: count,
+    // The outcome of a command the device just ran, reported back to close the
+    // loop (pending -> sent -> done/failed).
+    command_ack: z
+      .object({ id: z.string().uuid(), status: z.enum(["done", "failed"]), result: z.unknown().optional() })
+      .optional(),
   })
   .partial();
 
