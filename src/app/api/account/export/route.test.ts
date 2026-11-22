@@ -4,6 +4,7 @@ type FakeUser = { id: string; email?: string; phone?: string; created_at?: strin
 let user: FakeUser;
 const selects: Record<string, string> = {};
 
+vi.mock("@/server/securityLog", () => ({ recordSecurityEvent: async () => {} }));
 vi.mock("@/lib/supabase/server", () => ({
   supabaseServer: async () => ({
     auth: { getUser: async () => ({ data: { user } }) },
