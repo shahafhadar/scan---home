@@ -322,12 +322,17 @@ size_t flushQueue() {
   return acceptedCount;
 }
 
-bool heartbeat(bool scannerAttached, uint32_t keysSeen, String &commandOut) {
+bool heartbeat(bool scannerAttached, uint32_t keysSeen, String &commandOut,
+               const String &ackId, bool ackFailed) {
   JsonDocument doc;
   doc["fw"] = FIRMWARE_VERSION;
   doc["rssi"] = WiFi.RSSI();
   doc["scanner_attached"] = scannerAttached;
   doc["keys_seen"] = keysSeen;
+  if (ackId.length() > 0) {
+    doc["command_ack"]["id"] = ackId;
+    doc["command_ack"]["status"] = ackFailed ? "failed" : "done";
+  }
 
   // Everything needed to judge this device's health from somewhere else. A
   // leak shows as min_heap falling day over day; a loose socket shows as

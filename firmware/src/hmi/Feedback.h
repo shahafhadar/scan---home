@@ -35,4 +35,13 @@ void beepQueued();
 void beepError();
 void beepPaired();
 
+/**
+ * "Find this device": a few seconds of white strobe and three rising beeps,
+ * on top of whatever the LED is normally showing. Asked for from the app when
+ * someone cannot tell which board is which. Non-blocking, like everything
+ * else here -- tick() returns to the ordinary state colour on its own once
+ * the window ends.
+ */
+void flashLocate();
+
 }  // namespace Feedback

@@ -48,8 +48,15 @@ size_t flushQueue();
  * scanner is visible from the server. The usb build has no console -- the
  * socket that would carry one is the socket the scanner is plugged into -- so
  * without this there is no way to tell an unplugged scanner from a silent one.
+ *
+ * `ackId`, when not empty, reports that a command we were handed earlier has
+ * now run; the caller clears it only once this call returns true, so a lost
+ * reply does not silently drop the acknowledgement. Commands that reboot the
+ * board (reboot, factory_reset, reprovision) never reach this -- there is no
+ * next heartbeat to carry the ack on.
  */
-bool heartbeat(bool scannerAttached, uint32_t keysSeen, String &commandOut);
+bool heartbeat(bool scannerAttached, uint32_t keysSeen, String &commandOut,
+               const String &ackId = String(), bool ackFailed = false);
 
 /** Posts a diagnostics snapshot. Only ever sent because the server asked. */
 bool sendDiagnostics(const String &json);
