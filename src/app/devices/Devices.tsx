@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { AdoptPanel } from "./AdoptPanel";
+import { LocateButton } from "./LocateButton";
 
 type Device = {
   id: string;
@@ -172,6 +173,7 @@ export function Devices() {
                   <Stat label="נזרקו מהתור" value={d.queue_dropped} />
                   <Stat label="אתחול אחרון" value={d.reset_reason} />
                 </dl>
+                {online && <LocateButton deviceId={d.id} />}
               </li>
             );
           })}
