@@ -1,9 +1,11 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Turnstile } from "@/components/Turnstile";
+import { turnstileSiteKey } from "@/lib/features";
 import { supabaseBrowser, supabaseMailer } from "@/lib/supabase/client";
 
-type State = "idle" | "sending" | "sent" | "error" | "limited";
+type State = "idle" | "sending" | "sent" | "error" | "limited" | "captcha";
 
 export function EmailLogin() {
   const router = useRouter();
@@ -12,14 +14,23 @@ export function EmailLogin() {
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [badCode, setBadCode] = useState(false);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   const send = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (turnstileSiteKey && !captcha) {
+      setState("captcha");
+      return;
+    }
     setState("sending");
     const { error } = await supabaseMailer().auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback`, captchaToken: captcha ?? undefined },
     });
+    // The token is single-use; mint a fresh one for any resend.
+    setCaptcha(null);
+    setCaptchaReset((n) => n + 1);
     // 429: the mail provider's hourly cap. Saying so beats "try again",
     // which only spends another attempt against the same cap.
     setState(!error ? "sent" : error.status === 429 ? "limited" : "error");
@@ -99,9 +110,11 @@ export function EmailLogin() {
         placeholder="you@example.com"
         className="border rounded-xl px-3 py-3 bg-background focus:outline-2 focus:outline-accent"
       />
+      <Turnstile onToken={setCaptcha} resetKey={captchaReset} />
       <button disabled={state === "sending"} className="rounded-xl bg-accent text-accent-foreground py-3 font-medium disabled:opacity-60">
         {state === "sending" ? "שולח…" : "שלחו לי קישור כניסה"}
       </button>
+      {state === "captcha" && <p className="text-danger text-sm">השלימו את בדיקת האבטחה ולחצו שוב.</p>}
       {state === "error" && <p className="text-danger text-sm">השליחה נכשלה. נסו שוב בעוד רגע.</p>}
       {state === "limited" && (
         <p className="text-danger text-sm">נשלחו יותר מדי מיילים בזמן קצר. נסו שוב בעוד כמה דקות, או השתמשו בקישור שכבר הגיע.</p>

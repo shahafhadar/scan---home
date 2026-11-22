@@ -6,6 +6,11 @@ vi.mock("@/server/sms019", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/server/sms019")>()),
   sendSms,
 }));
+const reserveOtpSend = vi.fn();
+vi.mock("@/server/otpBudget", () => ({
+  reserveOtpSend: (...args: unknown[]) => reserveOtpSend(...args),
+  clientIp: () => null,
+}));
 const { POST } = await import("./route");
 
 const key = Buffer.from("hook-test-signing-key-material");
@@ -33,6 +38,7 @@ const hook = (phone = "972501234567", otp = "123456") => ({ user: { phone }, sms
 
 beforeEach(() => {
   sendSms.mockReset().mockResolvedValue("1");
+  reserveOtpSend.mockReset().mockResolvedValue(true);
   vi.stubEnv("SEND_SMS_HOOK_SECRET", SECRET);
   vi.stubEnv("SMS019_USERNAME", "acme");
   vi.stubEnv("SMS019_TOKEN", "t");
@@ -87,5 +93,12 @@ describe("send SMS hook", () => {
   it("rejects a malformed payload", async () => {
     expect((await call({ user: {}, sms: {} })).status).toBe(400);
     expect((await call({ user: { phone: "972501234567" }, sms: { otp: "abc" } })).status).toBe(400);
+  });
+
+  it("refuses, without sending, when the number is over its code budget", async () => {
+    reserveOtpSend.mockResolvedValueOnce(false);
+    const response = await call(hook());
+    expect(response.status).toBe(429);
+    expect(sendSms).not.toHaveBeenCalled();
   });
 });

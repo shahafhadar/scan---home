@@ -100,9 +100,11 @@ describe("POST /api/list/sms", () => {
     expect(sendSms).not.toHaveBeenCalled();
   });
 
-  it("reports a failed send without the number or the list in the log", async () => {
+  it("reports a failed send, refunds the allowance, and keeps the number and list out of the log", async () => {
     sendSms.mockRejectedValue(new Error("019 said no"));
     expect(await call()).toEqual({ status: 502, body: { error: "send_failed" } });
+    // The reserved send is given back, so a provider failure costs nothing.
+    expect(reserve).toHaveBeenCalledWith("release_sms_send");
     const logged = JSON.stringify(vi.mocked(console.error).mock.calls);
     expect(logged).not.toContain("972501234567");
     expect(logged).not.toContain("חלב");
