@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabase/server";
+import { recordSecurityEvent } from "@/server/securityLog";
 
 /**
  * "Download my data": the signed-in person's own data as JSON. Every read goes
@@ -36,6 +37,8 @@ export async function GET() {
     devices: devices.data ?? [],
     household_products: productNames.data ?? [],
   };
+
+  await recordSecurityEvent("account_exported", { userId: user.id });
 
   return Response.json(payload, {
     headers: {

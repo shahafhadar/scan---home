@@ -5,6 +5,7 @@ let user: FakeUser;
 const rpc = vi.fn();
 const signOut = vi.fn();
 
+vi.mock("@/server/securityLog", () => ({ recordSecurityEvent: async () => {} }));
 vi.mock("@/lib/supabase/server", () => ({
   supabaseServer: async () => ({
     auth: {
