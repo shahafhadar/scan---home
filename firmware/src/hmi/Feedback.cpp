@@ -18,6 +18,11 @@ uint8_t tonePlaying_ = 0;
 uint32_t toneStartedAt_ = 0;
 bool toneActive_ = false;
 
+// "Locate" overrides the LED for a fixed window; it never changes state_, so
+// the normal colour is exactly what comes back afterwards.
+constexpr uint32_t kLocateMs = 4000;
+uint32_t locateUntil_ = 0;
+
 void queueTone(uint16_t frequency, uint16_t durationMs) {
   if (toneCount_ >= kMaxTones) return;
   tones_[toneCount_++] = {frequency, durationMs};
@@ -87,6 +92,14 @@ void tick() {
   if (now - lastPaint < 25) return;
   lastPaint = now;
 
+  if (now < locateUntil_) {
+    // A fast, unmistakable strobe -- nothing else here blinks this quickly.
+    const bool on = (now / 120) % 2 == 0;
+    const uint8_t level = on ? 255 : 0;
+    if (level != lastR) { lastR = lastG = lastB = level; rgbLedWrite(PIN_LED, level, level, level); }
+    return;
+  }
+
   const Rgb base = colorFor(state_);
   uint8_t level = 255;
   if (breathes(state_)) {
@@ -127,6 +140,15 @@ void beepPaired() {
   queueTone(1600, 90);
   queueTone(2000, 90);
   queueTone(2600, 140);
+}
+
+void flashLocate() {
+  locateUntil_ = millis() + kLocateMs;
+  queueTone(2000, 120);
+  queueTone(0, 80);
+  queueTone(2400, 120);
+  queueTone(0, 80);
+  queueTone(2800, 160);
 }
 
 }  // namespace Feedback

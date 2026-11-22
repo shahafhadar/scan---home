@@ -10,7 +10,7 @@ type CommandType = "locate" | "reboot" | "reprovision" | "factory_reset";
  * restart the board immediately, before it can ever report back "done" over
  * this same channel, so "sent" is the last word we will hear.
  */
-const FIRES_AND_FORGETS: ReadonlySet<CommandType> = new Set(["reboot", "factory_reset"]);
+const FIRES_AND_FORGETS: ReadonlySet<CommandType> = new Set(["reboot", "factory_reset", "reprovision"]);
 
 const LABEL: Record<string, string> = {
   pending: "ממתין למכשיר…",

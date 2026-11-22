@@ -73,6 +73,12 @@ uint32_t lastBarcodeAt = 0;
 uint32_t resetHeldSince = 0;
 uint32_t portalCloseAt = 0;
 
+// The outcome of a command we ran, waiting to go out on the next heartbeat.
+// Only set for commands that do not reboot the board -- one that does has no
+// next heartbeat to carry the ack on.
+String pendingAckId_;
+bool pendingAckFailed_ = false;
+
 void handleFactoryReset();
 
 /**
@@ -265,9 +271,26 @@ void handleCommand(const String &command) {
     LOG_W("cmd", Err::BadResponse, "command has no action");
     return;
   }
+  const char *id = doc["id"] | "";
   LOG_I("cmd", "server asked for: %s", action);
 
-  if (strcmp(action, "reboot") == 0) {
+  if (strcmp(action, "locate") == 0) {
+    Feedback::flashLocate();
+    if (strlen(id) > 0) {
+      pendingAckId_ = id;
+      pendingAckFailed_ = false;
+    }
+
+  } else if (strcmp(action, "reprovision") == 0) {
+    // Forget the home network and reopen the setup portal, keeping identity
+    // and the queue intact -- this is a WiFi change, not a factory reset.
+    LOG_I("cmd", "reprovision on request: forgetting WiFi credentials");
+    Provisioning::clearCredentials();
+    SafeMode::expectRestart();
+    delay(200);
+    ESP.restart();
+
+  } else if (strcmp(action, "reboot") == 0) {
     LOG_I("cmd", "restarting on request");
     SafeMode::expectRestart();
     delay(200);
@@ -566,7 +589,11 @@ void loop() {
       if (millis() - lastHeartbeat > HEARTBEAT_INTERVAL_MS) {
         lastHeartbeat = millis();
         String command;
-        if (Uplink::heartbeat(scanner.attached(), scanner.keysSeen(), command)) {
+        const String ackId = pendingAckId_;
+        if (Uplink::heartbeat(scanner.attached(), scanner.keysSeen(), command, ackId, pendingAckFailed_)) {
+          // Only clear once the server actually has it; a lost reply means
+          // we try again on the next beat rather than drop the ack silently.
+          if (ackId.length() > 0 && pendingAckId_ == ackId) pendingAckId_ = "";
           handleCommand(command);
         }
       }
