@@ -28,5 +28,5 @@ export const firstScanSince = (scans: ScanRow[], since: string): ScanRow | null 
     .filter((s) => s.received_at >= since && s.list_item_id !== null)
     .sort((a, b) => a.received_at.localeCompare(b.received_at))[0] ?? null;
 
-export const STEPS = ["מה צריך", "חיווט", "הסורק", "קוד שיוך", "חיבור ל־WiFi", "סריקת בדיקה"] as const;
-export type Step = 0 | 1 | 2 | 3 | 4 | 5;
+export const STEPS = ["חיבור", "סריקת בדיקה"] as const;
+export type Step = 0 | 1;
