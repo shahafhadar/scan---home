@@ -136,3 +136,8 @@ jobs:
 
       - name: Build production
         run: pio run -e production
+
+      # The BLE diagnostic. Not shipped, but it is how a scanner's BLE protocol
+      # gets measured, and its NimBLE pin is the one the product will follow.
+      - name: Build blescan
+        run: pio run -e blescan
