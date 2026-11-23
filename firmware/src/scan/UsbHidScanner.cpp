@@ -26,6 +26,17 @@ void UsbHidScanner::begin() {
     LOG_W("usb", Err::ScannerLost, "scanner removed");
   });
 
+  // A powered USB hub between the board and the dongle is how the dongle gets
+  // real 5V (the board's own USB-OTG port does not supply VBUS -- see the
+  // class comment). Devices behind a hub enumerate fine either way; tracking
+  // the hub itself is not needed here and buys nothing for a plain HID
+  // keyboard, while it is the documented path to a hub-driver crash with at
+  // least one hub/device combination (EspUsbHost's
+  // tests/manual/README.md, "Hub combinations that crash ESP-IDF"). Off by
+  // default, before the first begin(), so a boot loop from that stays
+  // reflashable rather than something we discover on this product.
+  host_.setHubTrackingEnabled(false);
+
   lastSeenAt_ = millis();
   if (!host_.begin()) {
     LOG_E("usb", Err::ScannerLost, "host failed to start");
