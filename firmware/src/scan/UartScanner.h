@@ -1,4 +1,5 @@
 #pragma once
+#include "scan/LineAssembler.h"
 #include "scan/ScanSource.h"
 
 /**
@@ -12,5 +13,5 @@ class UartScanner : public ScanSource {
   const char *name() const override { return "uart"; }
 
  private:
-  String buffer_;
+  LineAssembler line_;
 };

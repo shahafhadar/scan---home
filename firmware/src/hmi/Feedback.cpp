@@ -23,6 +23,9 @@ bool toneActive_ = false;
 constexpr uint32_t kLocateMs = 4000;
 uint32_t locateUntil_ = 0;
 
+// Bluetooth scanner pairing: an overlay like locate, but held until switched off.
+bool scannerPairing_ = false;
+
 void queueTone(uint16_t frequency, uint16_t durationMs) {
   if (toneCount_ >= kMaxTones) return;
   tones_[toneCount_++] = {frequency, durationMs};
@@ -67,7 +70,9 @@ void tick() {
   // --- buzzer -------------------------------------------------------------
   if (toneActive_) {
     if (now - toneStartedAt_ >= tones_[tonePlaying_].durationMs) {
-      noTone(PIN_BUZZER);
+      // A rest (frequency 0) never started a tone, and stopping one that is
+      // not running logs an error on every pause in a melody.
+      if (tones_[tonePlaying_].frequency > 0) noTone(PIN_BUZZER);
       toneActive_ = false;
       tonePlaying_++;
       if (tonePlaying_ >= toneCount_) {
@@ -97,6 +102,17 @@ void tick() {
     const bool on = (now / 120) % 2 == 0;
     const uint8_t level = on ? 255 : 0;
     if (level != lastR) { lastR = lastG = lastB = level; rgbLedWrite(PIN_LED, level, level, level); }
+    return;
+  }
+
+  if (scannerPairing_) {
+    // Cyan, blinking at a walking pace: "looking for your scanner".
+    const bool on = (now / 300) % 2 == 0;
+    const uint8_t g = on ? 180 : 0, b = on ? 255 : 0;
+    if (lastR != 0 || lastG != g || lastB != b) {
+      lastR = 0; lastG = g; lastB = b;
+      rgbLedWrite(PIN_LED, 0, g, b);
+    }
     return;
   }
 
@@ -150,5 +166,15 @@ void flashLocate() {
   queueTone(0, 80);
   queueTone(2800, 160);
 }
+
+void setScannerPairing(bool on) { scannerPairing_ = on; }
+
+void beepPairingStarted() {
+  queueTone(1200, 70);
+  queueTone(0, 40);
+  queueTone(1700, 70);
+}
+
+void beepHint() { queueTone(1500, 40); }
 
 }  // namespace Feedback

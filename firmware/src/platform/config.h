@@ -18,7 +18,7 @@
 #define SCANCART_HOST "https://api.scancart.example"
 #endif
 
-#define FIRMWARE_VERSION "1.1.2"
+#define FIRMWARE_VERSION "1.2.0"
 
 // The board this build expects. Reported in the heartbeat and in diagnostics,
 // because the first question about any field fault is "which one is it?" --
@@ -91,6 +91,15 @@ static_assert(scancartHostIsHttps(SCANCART_HOST),
 #define WIFI_MAX_ATTEMPTS 3
 
 #define FACTORY_RESET_HOLD_MS 10000
+
+// Bluetooth LE scanner. The same BOOT button: held at least PAIR_HOLD and
+// released before PAIR_MAX_HOLD starts pairing a scanner; released later does
+// nothing (the person was heading for a reset and changed their mind); held to
+// FACTORY_RESET_HOLD wipes the device as before.
+#define SCANNER_PAIR_HOLD_MS 3000
+#define SCANNER_PAIR_MAX_HOLD_MS 8000
+#define SCANNER_PAIR_WINDOW_MS 60000
+#define SCANNER_BLE_CONNECT_TIMEOUT_MS 4000
 
 // ---------------------------------------------------------------- resilience
 // Generous on purpose. A watchdog that fires during a slow but legitimate
