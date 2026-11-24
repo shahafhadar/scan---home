@@ -16,6 +16,7 @@ import { POST as heartbeatRoute } from "@/app/api/v1/devices/heartbeat/route";
 import { POST as diagnosticsRoute } from "@/app/api/v1/devices/diagnostics/route";
 import { POST as scanRoute } from "@/app/api/v1/scans/route";
 import { POST as batchRoute } from "@/app/api/v1/scans/batch/route";
+import { GET as firmwareFileRoute } from "@/app/api/v1/firmware/[file]/route";
 
 /** Admin connection to any database on the test server, e.g. postgres://postgres@localhost:5432/postgres */
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -173,6 +174,26 @@ export class FakeDevice {
       body: method === "GET" ? undefined : raw,
     });
     return toReply(await routes[route](request));
+  }
+
+  /**
+   * Fetches a firmware file the way the firmware does: a GET signed over an
+   * empty body. `sign: false` leaves the auth headers off.
+   */
+  async download(file: string, opts: { sign?: boolean } = {}): Promise<{ status: number; bytes: Buffer; length: string | null }> {
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const headers: Record<string, string> =
+      opts.sign === false
+        ? {}
+        : { "x-device-id": this.serial, "x-timestamp": timestamp, "x-signature": signPayload(this.secretHash, timestamp, "") };
+    const response = await firmwareFileRoute(new Request(`http://test/api/v1/firmware/${file}`, { headers }), {
+      params: Promise.resolve({ file }),
+    });
+    return {
+      status: response.status,
+      bytes: Buffer.from(await response.arrayBuffer()),
+      length: response.headers.get("content-length"),
+    };
   }
 
   scan(barcode: string, scanId: string = randomUUID(), extra: Record<string, unknown> = {}): Promise<Reply> {

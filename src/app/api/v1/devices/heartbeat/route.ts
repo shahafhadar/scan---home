@@ -30,6 +30,16 @@ const beat = z
     errors: count,
     wifi_reconnects: count,
     usb_restarts: count,
+    // Which build the image is (usb, uart, production...): offers only ever
+    // match the same build and board.
+    build: z.string().regex(/^[a-z0-9_-]{1,32}$/),
+    // Where updating stands on the device (docs/firmware-ota.md).
+    ota: z.object({
+      state: z.enum(["idle", "pending", "downloading", "probation", "failed"]),
+      target: z.string().max(32).optional(),
+      rejected: z.string().max(32).optional(),
+      error: z.string().max(80).optional(),
+    }),
     // The outcome of a command the device just ran, reported back to close the
     // loop (pending -> sent -> done/failed).
     command_ack: z
@@ -38,7 +48,11 @@ const beat = z
   })
   .partial();
 
-/** Telemetry in, and at most one command out, so no broker is needed. */
+/**
+ * Telemetry in; at most one command out, plus the firmware update this device
+ * should move to, if any -- so no broker is needed. The offer is repeated on
+ * every beat while it stands, and its absence tells the device to drop it.
+ */
 export async function POST(request: Request): Promise<Response> {
   const raw = await request.text();
   const auth = await authenticateDevice(request, raw);
@@ -56,5 +70,13 @@ export async function POST(request: Request): Promise<Response> {
     auth.device.id,
     JSON.stringify(parsed),
   ]);
-  return json({ ok: true, claimed: auth.device.household_id !== null, command: row?.command ?? null });
+  // A separate statement, so the offer sees the version and build this very
+  // beat just recorded.
+  const offer = await one<{ update: unknown }>(`SELECT public.firmware_offer($1) AS update`, [auth.device.id]);
+  return json({
+    ok: true,
+    claimed: auth.device.household_id !== null,
+    command: row?.command ?? null,
+    update: offer?.update ?? null,
+  });
 }
