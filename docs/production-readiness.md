@@ -32,9 +32,10 @@
 
 - **אין BLE / native app / MQTT.** החלטה מכוונת (ראו `architecture.md`) —
   לא תכנון חסר, אלא היקף שנדחה.
-- **אין OTA מהיר-יותר מהפעלה-מחדש מרחוק.** `ota` כפעולה קיימת מהפרוטוטייפ
-  (`handleCommand`), אבל לא עברה דרך מחזור ה-`device_commands` החדש — אין
-  לה id/ack/expiry כמו locate/reboot/factory_reset/reprovision.
+- **עדכוני OTA אוטומטיים: אימג'ים ב-Postgres.** מכשירים מתעדכנים לבד מהצעה
+  ב-heartbeat ([`firmware-ota.md`](firmware-ota.md)); פקודת ה-`ota` הידנית
+  מהפרוטוטייפ הוסרה. האימג'ים שמורים כ-`bytea` — מספיק לצי קטן, לא לאלפי
+  מכשירים (אז: Storage + CDN). אין delta ואין downgrade, בכוונה.
 - **אין Rate limiting ברמת ה-API של device API** (handoff: "per-route rate
   limiting for device calls" — Milestone 2, לא בוצע).
 - **viewer יכול עדיין לקרוא טלמטריה מפורטת** (RLS ל-SELECT לא הוגבל לפי
