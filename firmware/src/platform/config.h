@@ -177,10 +177,10 @@ static_assert(scancartHostIsHttps(SCANCART_HOST),
 // for someone to notice.
 #define OTA_PROBATION_GIVEUP_MS 900000
 
-// No bytes for this long during a download and we stop waiting. Separate from
-// the HTTP timeout, which only covers the connection, not a stream that opens
-// and then goes quiet.
-#define OTA_STALL_TIMEOUT_MS 30000
+// One read of a firmware download may wait this long for bytes -- covers a
+// stream that opens and then goes quiet, not only the connection. Under the
+// watchdog's 30s, so a stalled server ends the attempt instead of the board.
+#define OTA_HTTP_TIMEOUT_MS 20000
 
 // The size of one application slot (partitions.csv). An offer bigger than this
 // cannot be installed, so it is refused before a byte is downloaded.

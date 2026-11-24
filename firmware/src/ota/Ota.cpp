@@ -6,8 +6,6 @@
 #include <WiFi.h>
 #include <esp_ota_ops.h>
 
-#include <memory>
-#include <new>
 
 #include "core/SafeMode.h"
 #include "core/Watchdog.h"
@@ -52,7 +50,6 @@ extern "C" __attribute__((used)) const char kScancartImageTag[] =
 namespace {
 
 constexpr const char *kPrefs = "ota";
-constexpr size_t kChunk = 4096;
 
 bool probation = false;
 uint32_t serverContacts = 0;
@@ -140,6 +137,110 @@ void confirmedNewImage() {
 }
 
 /**
+ * Where HTTPClient::writeToStream() delivers a body.
+ *
+ * Bodies are never read off the raw socket: Vercel streams every function
+ * response chunked, whatever Content-Length the function set, and the raw
+ * stream of a chunked reply has chunk headers mixed into it. writeToStream()
+ * decodes both framings, so the same code handles either.
+ */
+class Sink : public Stream {
+ public:
+  size_t write(uint8_t b) override { return write(&b, 1); }
+  int available() override { return 0; }
+  int read() override { return -1; }
+  int peek() override { return -1; }
+  void flush() override {}
+  using Print::write;
+};
+
+/** A small body (the signature) into a fixed buffer. Overflow is a failure. */
+class BufferSink : public Sink {
+ public:
+  BufferSink(uint8_t *out, size_t capacity) : out_(out), capacity_(capacity) {}
+  size_t write(const uint8_t *data, size_t length) override {
+    if (length > capacity_ - length_) {
+      overflowed_ = true;
+      return 0;
+    }
+    memcpy(out_ + length_, data, length);
+    length_ += length;
+    return length;
+  }
+  size_t length() const { return length_; }
+  bool overflowed() const { return overflowed_; }
+
+ private:
+  uint8_t *out_;
+  size_t capacity_;
+  size_t length_ = 0;
+  bool overflowed_ = false;
+};
+
+/**
+ * The image, straight into the inactive slot and the hash, as it arrives.
+ *
+ * Hashed on the way past rather than read back afterwards: the image is
+ * megabytes and the heap is not, and re-reading flash would only prove what
+ * was stored, not what arrived. Refuses a single byte past the offered size.
+ */
+class FlashSink : public Sink {
+ public:
+  FlashSink(Signature::Digest &digest, size_t expected) : digest_(digest), expected_(expected) {}
+
+  size_t write(const uint8_t *data, size_t length) override {
+    // Called for every block of the download, which can legitimately outlast
+    // the watchdog window several times over.
+    Watchdog::feed();
+    Feedback::tick();
+    if (!error_.isEmpty()) return 0;
+    if (length > expected_ - written_) {
+      error_ = "longer than offered";
+      return 0;
+    }
+    if (Update.write(const_cast<uint8_t *>(data), length) != length) {
+      error_ = String("flash write: ") + Update.errorString();
+      return 0;
+    }
+    digest_.update(data, length);
+    written_ += length;
+    if (quarter_ < 4 && written_ * 4 >= expected_ * quarter_) {
+      LOG_I("ota", "%u%%", quarter_ * 25u);
+      quarter_++;
+    }
+    return length;
+  }
+
+  size_t written() const { return written_; }
+  const String &error() const { return error_; }
+
+ private:
+  Signature::Digest &digest_;
+  size_t expected_;
+  size_t written_ = 0;
+  unsigned quarter_ = 1;
+  String error_;
+};
+
+/** A signed GET to our own host. False with `error` set if it is not a 200. */
+bool get(HTTPClient &http, WiFiClient &client, const String &url, const char *what, String &error) {
+  // Under the watchdog's 30s: a stalled read gives up before the board resets.
+  http.setTimeout(OTA_HTTP_TIMEOUT_MS);
+  if (!http.begin(client, url)) {
+    error = String(what) + ": no connection";
+    return false;
+  }
+  Uplink::sign(http, "");
+  const int status = http.GET();
+  if (status != 200) {
+    error = String(what) + ": http " + String(status);
+    http.end();
+    return false;
+  }
+  return true;
+}
+
+/**
  * Fetches the detached signature that sits beside every published image.
  *
  * Fetched first: a published image without a signature is a release mistake,
@@ -149,42 +250,18 @@ bool fetchSignature(const String &url, uint8_t *out, size_t capacity, size_t &le
                     String &error) {
   auto client = Uplink::newClient();
   HTTPClient http;
-  http.setTimeout(HTTP_TIMEOUT_MS);
-  if (!http.begin(*client, url + ".sig")) {
-    error = "signature: no connection";
+  if (!get(http, *client, url + ".sig", "signature", error)) {
+    LOG_E("ota", Err::OtaBadSignature, "no signature for this image (%s)", error.c_str());
     return false;
   }
-  Uplink::sign(http, "");
-
-  const int status = http.GET();
-  if (status != 200) {
-    error = "signature: http " + String(status);
-    LOG_E("ota", Err::OtaBadSignature, "no signature for this image (%d)", status);
-    http.end();
-    return false;
-  }
-
-  const int size = http.getSize();
-  if (size <= 0 || static_cast<size_t>(size) > capacity) {
-    error = "signature: " + String(size) + " bytes";
-    LOG_E("ota", Err::OtaBadSignature, "signature is %d bytes, which is not a signature", size);
-    http.end();
-    return false;
-  }
-
-  WiFiClient *stream = http.getStreamPtr();
-  size_t read = 0;
-  const uint32_t deadline = millis() + HTTP_TIMEOUT_MS;
-  while (read < static_cast<size_t>(size) && static_cast<int32_t>(millis() - deadline) < 0) {
-    const int n = stream->read(out + read, size - read);
-    if (n > 0) read += n;
-    else delay(5);
-  }
+  BufferSink sink(out, capacity);
+  const int result = http.writeToStream(&sink);
   http.end();
-
-  lengthOut = read;
-  if (read != static_cast<size_t>(size)) {
-    error = "signature: incomplete";
+  lengthOut = sink.length();
+  if (result < 0 || sink.overflowed() || lengthOut < 8) {
+    error = sink.overflowed() ? String("signature: too long")
+                              : "signature: " + HTTPClient::errorToString(result);
+    LOG_E("ota", Err::OtaBadSignature, "could not read the signature (%s)", error.c_str());
     return false;
   }
   return true;
@@ -216,114 +293,52 @@ bool install(const OtaPolicy::Offer &offer, String &error) {
   size_t signatureLength = 0;
   if (!fetchSignature(url, signature, sizeof(signature), signatureLength, error)) return false;
 
-  std::unique_ptr<uint8_t[]> buffer(new (std::nothrow) uint8_t[kChunk]);
-  if (!buffer) {
-    error = "no memory for the download";
-    return false;
-  }
-
   Feedback::setState(Feedback::State::Updating);
   LOG_I("ota", "updating %s -> %s (%u bytes)", FIRMWARE_VERSION, offer.version,
         static_cast<unsigned>(offer.size));
 
   auto client = Uplink::newClient();
   HTTPClient http;
-  http.setTimeout(30000);
-  if (!http.begin(*client, url)) {
-    error = "no connection";
-    return false;
-  }
-  Uplink::sign(http, "");
-
-  const int status = http.GET();
-  if (status != 200) {
-    error = "download: http " + String(status);
-    LOG_E("ota", Err::OtaFailed, "download failed with status %d", status);
-    http.end();
+  if (!get(http, *client, url, "download", error)) {
+    LOG_E("ota", Err::OtaFailed, "download failed (%s)", error.c_str());
     return false;
   }
 
-  // The offer said how big the image is. A different length is a different
-  // image, and finding that out now saves writing it to flash first.
-  const int length = http.getSize();
-  if (length <= 0 || static_cast<uint32_t>(length) != offer.size) {
-    error = "size " + String(length) + ", offered " + String(offer.size);
-    LOG_E("ota", Err::OtaFailed, "image is %d bytes, the offer said %u", length,
+  // A declared length that disagrees with the offer is a different image;
+  // finding that out now saves writing it to flash first. (Usually there is
+  // none -- the reply is chunked -- and the count is checked at the end.)
+  const int declared = http.getSize();
+  if (declared > 0 && static_cast<uint32_t>(declared) != offer.size) {
+    error = "size " + String(declared) + ", offered " + String(offer.size);
+    LOG_E("ota", Err::OtaFailed, "image is %d bytes, the offer said %u", declared,
           static_cast<unsigned>(offer.size));
     http.end();
     return false;
   }
 
   // U_FLASH writes to the inactive slot; the running firmware is untouched.
-  if (!Update.begin(length, U_FLASH)) {
+  if (!Update.begin(offer.size, U_FLASH)) {
     error = String("no room: ") + Update.errorString();
     LOG_E("ota", Err::OtaFailed, "no room for the image: %s", Update.errorString());
     http.end();
     return false;
   }
 
-  // Hashed on the way past rather than read back afterwards: the image is
-  // megabytes and the heap is not, and re-reading flash to hash it would only
-  // prove what was stored, not what arrived.
   Signature::Digest digest;
-  WiFiClient *stream = http.getStreamPtr();
-  size_t written = 0;
-  uint32_t lastProgress = millis();
-  const uint32_t startedAt = lastProgress;
-  uint8_t nextQuarter = 1;
-
-  while (written < static_cast<size_t>(length)) {
-    // A slow network must not look like a hung device. The download can
-    // legitimately outlast the watchdog window several times over.
-    Watchdog::feed();
-    Feedback::tick();
-
-    const int available = stream->available();
-    if (available <= 0) {
-      if (!stream->connected()) {
-        error = "connection closed at " + String(written);
-        LOG_E("ota", Err::OtaFailed, "server closed the download at %u of %d bytes",
-              static_cast<unsigned>(written), length);
-        Update.abort();
-        http.end();
-        return false;
-      }
-      if (millis() - lastProgress > OTA_STALL_TIMEOUT_MS) {
-        error = "stalled at " + String(written);
-        LOG_E("ota", Err::OtaFailed, "download stalled at %u of %d bytes",
-              static_cast<unsigned>(written), length);
-        Update.abort();
-        http.end();
-        return false;
-      }
-      delay(5);
-      continue;
-    }
-
-    size_t want = static_cast<size_t>(length) - written;
-    if (want > kChunk) want = kChunk;
-    if (want > static_cast<size_t>(available)) want = available;
-    const int n = stream->read(buffer.get(), want);
-    if (n <= 0) continue;
-
-    if (Update.write(buffer.get(), n) != static_cast<size_t>(n)) {
-      error = String("flash write: ") + Update.errorString();
-      LOG_E("ota", Err::OtaFailed, "flash write failed: %s", Update.errorString());
-      Update.abort();
-      http.end();
-      return false;
-    }
-    digest.update(buffer.get(), n);
-    written += n;
-    lastProgress = millis();
-
-    if (nextQuarter < 4 && written * 4 >= static_cast<size_t>(length) * nextQuarter) {
-      LOG_I("ota", "%u%% (%us)", nextQuarter * 25u,
-            static_cast<unsigned>((millis() - startedAt) / 1000));
-      nextQuarter++;
-    }
-  }
+  FlashSink sink(digest, offer.size);
+  const uint32_t startedAt = millis();
+  const int result = http.writeToStream(&sink);
   http.end();
+
+  if (!sink.error().isEmpty() || result < 0 || sink.written() != offer.size) {
+    error = !sink.error().isEmpty() ? sink.error()
+            : result < 0            ? "download: " + HTTPClient::errorToString(result)
+                                    : "short: " + String(sink.written());
+    LOG_E("ota", Err::OtaFailed, "download failed at %u of %u bytes (%s)",
+          static_cast<unsigned>(sink.written()), static_cast<unsigned>(offer.size), error.c_str());
+    Update.abort();
+    return false;
+  }
 
   uint8_t hash[32];
   digest.finish(hash);
