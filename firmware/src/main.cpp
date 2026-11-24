@@ -39,9 +39,24 @@
 #include "platform/Validate.h"
 #include "platform/config.h"
 
-#if defined(SCANNER_USB_HID)
+#if defined(SCANNER_BLE)
+// Kept by name, not only behind `scanner`: the BOOT button and the server's
+// pair/forget commands talk to it directly.
+#include "scan/BleScanner.h"
+BleScanner bleScanner;
+#endif
+
+#if defined(SCANNER_USB_HID) && defined(SCANNER_BLE)
+// The product: the 2.4GHz dongle and a Bluetooth LE scanner, whichever is there.
+#include "scan/CompositeScanner.h"
+#include "scan/UsbHidScanner.h"
+UsbHidScanner usbScanner;
+CompositeScanner scanner(usbScanner, bleScanner);
+#elif defined(SCANNER_USB_HID)
 #include "scan/UsbHidScanner.h"
 UsbHidScanner scanner;
+#elif defined(SCANNER_BLE)
+BleScanner &scanner = bleScanner;
 #elif defined(SCANNER_UART)
 #include "scan/UartScanner.h"
 UartScanner scanner;
@@ -121,7 +136,14 @@ bool connectWifi() {
   LOG_I("wifi", "connecting to %s", ssid.c_str());
 
   WiFi.mode(WIFI_STA);
+#if defined(SCANNER_BLE)
+  // WiFi and Bluetooth share one radio, and ESP-IDF requires WiFi modem sleep
+  // while both run: the coexistence scheduler hands the antenna to Bluetooth
+  // in WiFi's sleep slots. The cost is some latency on incoming packets.
+  WiFi.setSleep(true);
+#else
   WiFi.setSleep(false);  // a sleeping radio adds seconds to the first request
+#endif
   WiFi.begin(ssid.c_str(), password.c_str());
 
   const uint32_t deadline = millis() + WIFI_CONNECT_TIMEOUT_MS;
@@ -157,21 +179,51 @@ bool syncTime() {
   return ok;
 }
 
+/** Everything a factory reset forgets, from the button or from the server. */
+void wipeDevice() {
+  ScanQueue::clear();
+  Provisioning::clearCredentials();
+  DeviceIdentity::factoryReset();
+#if defined(SCANNER_BLE)
+  BleScanner::eraseStored();  // the next owner pairs their own scanner
+#endif
+}
+
+/**
+ * The BOOT button. Held 10s: factory reset, as always. With a Bluetooth
+ * scanner build, a shorter hold does something gentler on release: 3-8s pairs
+ * a new scanner. A beep at 3s says "let go now to pair".
+ */
 void handleFactoryReset() {
   if (digitalRead(PIN_FACTORY_RESET) == LOW) {
     if (resetHeldSince == 0) resetHeldSince = millis();
-    if (millis() - resetHeldSince > FACTORY_RESET_HOLD_MS) {
+    const uint32_t held = millis() - resetHeldSince;
+#if defined(SCANNER_BLE)
+    static bool hinted = false;
+    if (held < SCANNER_PAIR_HOLD_MS) hinted = false;
+    if (held >= SCANNER_PAIR_HOLD_MS && !hinted) {
+      hinted = true;
+      Feedback::beepHint();
+    }
+#endif
+    if (held > FACTORY_RESET_HOLD_MS) {
       LOG_C("reset", Err::None, "factory reset: wiping this device");
       Feedback::setState(Feedback::State::Error);
       Feedback::tick();
-      ScanQueue::clear();
-      Provisioning::clearCredentials();
-      DeviceIdentity::factoryReset();
+      wipeDevice();
       SafeMode::expectRestart();
       delay(500);
       ESP.restart();
     }
   } else {
+#if defined(SCANNER_BLE)
+    if (resetHeldSince != 0) {
+      const uint32_t held = millis() - resetHeldSince;
+      if (held >= SCANNER_PAIR_HOLD_MS && held < SCANNER_PAIR_MAX_HOLD_MS) {
+        bleScanner.startPairing();
+      }
+    }
+#endif
     resetHeldSince = 0;
   }
 }
@@ -305,11 +357,28 @@ void handleCommand(const String &command) {
     }
     Ota::applyUpdate(String(url), String(version));
 
+#if defined(SCANNER_BLE)
+  } else if (strcmp(action, "pair_scanner") == 0) {
+    // Same as releasing BOOT after 3s: listen for a scanner for a minute. The
+    // ack says the board started looking, not that a scanner was found --
+    // the heartbeat's scanner_attached says that, once it is.
+    bleScanner.startPairing();
+    if (strlen(id) > 0) {
+      pendingAckId_ = id;
+      pendingAckFailed_ = false;
+    }
+
+  } else if (strcmp(action, "forget_scanner") == 0) {
+    bleScanner.forgetScanner();
+    if (strlen(id) > 0) {
+      pendingAckId_ = id;
+      pendingAckFailed_ = false;
+    }
+#endif
+
   } else if (strcmp(action, "factory_reset") == 0) {
     LOG_C("cmd", Err::None, "factory reset on request");
-    ScanQueue::clear();
-    Provisioning::clearCredentials();
-    DeviceIdentity::factoryReset();
+    wipeDevice();
     SafeMode::expectRestart();
     delay(200);
     ESP.restart();

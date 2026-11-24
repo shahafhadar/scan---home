@@ -44,4 +44,16 @@ void beepPaired();
  */
 void flashLocate();
 
+/**
+ * Bluetooth scanner pairing. While on, the LED blinks cyan -- a colour used
+ * for nothing else -- over the normal state, like flashLocate. The board is
+ * listening for a scanner to adopt; turning it off returns to the ordinary
+ * colour.
+ */
+void setScannerPairing(bool on);
+// Pairing has started: two quick rising notes.
+void beepPairingStarted();
+// The BOOT button has been held long enough to pair a scanner on release.
+void beepHint();
+
 }  // namespace Feedback
