@@ -18,7 +18,7 @@
 #define SCANCART_HOST "https://api.scancart.example"
 #endif
 
-#define FIRMWARE_VERSION "1.3.1"
+#define FIRMWARE_VERSION "1.3.2"
 
 // The `otatest` build: an image that boots normally but never completes a
 // heartbeat, so it can never pass probation and the board has to roll itself
