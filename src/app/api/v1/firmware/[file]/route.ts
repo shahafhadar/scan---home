@@ -12,8 +12,8 @@ const FILE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.b
  *
  * Only a release built for this device's build and board, and not pulled, is
  * served; anything else is 404, so ids are not a way to fish for images. The
- * length is always declared: the firmware checks it against the offer before
- * writing a byte to flash.
+ * length is declared, but Vercel streams the body chunked anyway; the firmware
+ * counts the bytes against the size in the offer and refuses one past it.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ file: string }> }): Promise<Response> {
   const auth = await authenticateDevice(request, "");
