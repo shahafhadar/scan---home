@@ -505,6 +505,14 @@ void setup() {
 }
 
 void loop() {
+  // Rest first. Arduino calls loop() back to back with no pause, so without
+  // this the core spun at 100% at 240MHz all day doing nothing -- the single
+  // largest draw on the board. A short sleep lets the idle task clock-gate the
+  // core (WAITI) between iterations. Nothing here needs to be faster: the USB
+  // host and Bluetooth run on their own tasks and buffer what arrives, and the
+  // LED and buzzer are timed in tens of milliseconds.
+  vTaskDelay(pdMS_TO_TICKS(LOOP_IDLE_MS));
+
   // pump() is also called from inside every long wait, so these run whether
   // the firmware is idle or halfway through connecting.
   pump();

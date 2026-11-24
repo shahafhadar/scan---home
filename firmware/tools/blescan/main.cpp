@@ -194,6 +194,51 @@ void probe(const NimBLEAdvertisedDevice *device, bool listen) {
   NimBLEDevice::deleteClient(client);
 }
 
+/**
+ * How often the scanner advertises while it is awake and unconnected. This is
+ * what sets how little the product firmware can afford to listen: with an
+ * advert every A ms, a scan window a little longer than A catches it in the
+ * first window, so the radio can sleep the rest of the interval without
+ * slowing the reconnect.
+ */
+class AdvertTimer : public NimBLEScanCallbacks {
+ public:
+  // With duplicates on, NimBLE calls this once per advertisement (scan
+  // responses excluded), and the device object already carries the name a
+  // previous scan response gave it.
+  void onDiscovered(const NimBLEAdvertisedDevice *device) override {
+    if (!looksLikeScanner(device)) return;
+    if (count_ < kMax) stamps_[count_++] = millis();
+  }
+  void reset() { count_ = 0; }
+  void print() const {
+    if (count_ < 3) return;
+    uint32_t gaps[kMax];
+    size_t n = 0;
+    for (size_t i = 1; i < count_; i++) gaps[n++] = stamps_[i] - stamps_[i - 1];
+    // Median, not mean: a missed advert doubles one gap.
+    for (size_t i = 1; i < n; i++) {
+      for (size_t j = i; j > 0 && gaps[j - 1] > gaps[j]; j--) {
+        const uint32_t t = gaps[j];
+        gaps[j] = gaps[j - 1];
+        gaps[j - 1] = t;
+      }
+    }
+    Serial.printf("advert timing: %u adverts over %u ms, gap min %u / median %u / max %u ms\n",
+                  static_cast<unsigned>(count_),
+                  static_cast<unsigned>(stamps_[count_ - 1] - stamps_[0]),
+                  static_cast<unsigned>(gaps[0]), static_cast<unsigned>(gaps[n / 2]),
+                  static_cast<unsigned>(gaps[n - 1]));
+  }
+
+ private:
+  static constexpr size_t kMax = 400;
+  uint32_t stamps_[kMax] = {};
+  size_t count_ = 0;
+};
+
+AdvertTimer advertTimer;
+
 }  // namespace
 
 void setup() {
@@ -214,9 +259,12 @@ void loop() {
   scan->setActiveScan(true);
   scan->setInterval(100);
   scan->setWindow(99);
+  scan->setScanCallbacks(&advertTimer, true);  // every advert, for the timing
+  advertTimer.reset();
 
   Serial.println("--- scanning 6s ---");
   NimBLEScanResults found = scan->getResults(6000, false);  // blocking, ms
+  advertTimer.print();
 
   int best = -1;
   for (int i = 0; i < found.getCount(); i++) {

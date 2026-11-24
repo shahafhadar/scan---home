@@ -18,7 +18,7 @@
 #define SCANCART_HOST "https://api.scancart.example"
 #endif
 
-#define FIRMWARE_VERSION "1.3.0"
+#define FIRMWARE_VERSION "1.3.1"
 
 // The `otatest` build: an image that boots normally but never completes a
 // heartbeat, so it can never pass probation and the board has to roll itself
@@ -85,6 +85,11 @@ static_assert(scancartHostIsHttps(SCANCART_HOST),
 // A scanner can emit the same code twice in one trigger pull. Anything inside
 // this window is the same physical scan.
 #define SCAN_DEBOUNCE_MS 500
+
+// How long the main loop rests between iterations. A barcode waits at most
+// this long to be noticed; a core that is not spinning draws a fraction of
+// one that is (platform/Power.h measures it).
+#define LOOP_IDLE_MS 10
 
 
 #define QUEUE_MAX_ENTRIES 500
