@@ -16,9 +16,45 @@ type Device = {
   last_rssi: number | null;
   scanner_attached: boolean | null;
   safe_mode: boolean;
+  ota_state: string | null;
+  ota_target_version: string | null;
+  ota_rejected_version: string | null;
 };
 
-const COLUMNS = "id, serial, name, household_id, status, firmware_version, last_seen_at, last_rssi, scanner_attached, safe_mode";
+const COLUMNS =
+  "id, serial, name, household_id, status, firmware_version, last_seen_at, last_rssi, scanner_attached, safe_mode, " +
+  "ota_state, ota_target_version, ota_rejected_version";
+
+/** 1.10.0 > 1.9.0: compared as numbers, never as text. */
+const versionCode = (v: string | null): number | null => {
+  const m = v ? /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(v) : null;
+  return m ? Number(m[1]) * 1_000_000 + Number(m[2]) * 1_000 + Number(m[3]) : null;
+};
+
+/**
+ * Where automatic updating stands, in a sentence (docs/firmware-ota.md).
+ * Null for firmware too old to report it.
+ */
+export const updateStatus = (d: Pick<Device, "firmware_version" | "ota_state" | "ota_target_version" | "ota_rejected_version">): string | null => {
+  if (!d.ota_state) return null;
+  const target = d.ota_target_version;
+  const rejected = versionCode(d.ota_rejected_version);
+  const current = versionCode(d.firmware_version);
+  switch (d.ota_state) {
+    case "pending":
+      return target ? `גרסה ${target} תותקן ברגע שקט` : "ממתין לעדכון";
+    case "downloading":
+      return target ? `מתעדכנת ל-${target}…` : "מתעדכנת…";
+    case "probation":
+      return "בבדיקה אחרי עדכון";
+    case "failed":
+      return target ? `העדכון ל-${target} לא הצליח, ינסה שוב` : "העדכון לא הצליח, ינסה שוב";
+  }
+  if (rejected !== null && current !== null && rejected > current) {
+    return `העדכון ל-${d.ota_rejected_version} נכשל, חזרה ל-${d.firmware_version}`;
+  }
+  return "מעודכנת";
+};
 
 const isOnline = (lastSeen: string | null): boolean => lastSeen !== null && Date.now() - new Date(lastSeen).getTime() < 3 * 60_000;
 
@@ -101,6 +137,7 @@ export function DeviceDetail({ deviceId }: { deviceId: string }) {
         <Row label="סטטוס" value={online ? "מחובר" : "לא מחובר"} />
         <Row label="נראה" value={ago(device.last_seen_at)} />
         <Row label="גרסת קושחה" value={device.firmware_version} ltr />
+        {updateStatus(device) && <Row label="עדכונים" value={updateStatus(device)} />}
         <Row label="עוצמת WiFi" value={device.last_rssi !== null ? `${device.last_rssi} dBm` : null} ltr />
         <Row label="סורק" value={device.scanner_attached === null ? null : device.scanner_attached ? "מחובר" : "לא מחובר"} />
         {device.safe_mode && <p className="text-danger">המכשיר במצב בטוח אחרי אתחולים כושלים.</p>}

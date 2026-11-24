@@ -26,15 +26,21 @@ scans are deduplicated by `scan_id`.
 | `GET /api/v1/devices/claim-status` | – | `{claimed, status, pairing_code?}` |
 | `POST /api/v1/scans` | `{scan_id, barcode, symbology?, ts?, queued?, quantity?}` | `200 {scan_id, status: added\|bumped\|duplicate, name, identified, quantity}` or `202 {status: held}` before pairing |
 | `POST /api/v1/scans/batch` | `{scans: [scan, …≤100]}` | `{results, accepted: [scan_id…]}` – delete from the queue only what is in `accepted` |
-| `POST /api/v1/devices/heartbeat` | telemetry, see below | `{ok, claimed, command}` – `command` is handed over exactly once |
+| `POST /api/v1/devices/heartbeat` | telemetry, see below | `{ok, claimed, command, update}` – `command` is handed over exactly once; `update` is repeated every beat while it stands |
 | `POST /api/v1/devices/diagnostics` | any JSON object ≤16 KB | `{ok}` |
+| `GET /api/v1/firmware/<id>.bin`, `<id>.bin.sig` | – (signed over an empty body) | the image / its DER signature, `application/octet-stream`; `404` unless built for this device's build and board |
+| `POST /api/v1/firmware/releases` (unsigned; the image signature is the authorisation) | the image, `X-Firmware-Signature: <base64 DER>` | `201 {id, version, build, hw, rollout_percent: 0}` |
 
 Every reply carries `Content-Length`; the firmware refuses a body without one.
 
 Heartbeat fields (all optional): `fw, rssi, scanner_attached, keys_seen, uptime,
 reset_reason, boot_count, safe_mode, failed_boots, ota_probation, hw, self_test,
 free_heap, min_heap, queue_size, queue_failed, queue_dropped, errors,
-wifi_reconnects, usb_restarts`.
+wifi_reconnects, usb_restarts, build, ota {state, target?, rejected?, error?}`.
+
+`update`, when present, is `{version, path, size, sha256}`: a newer signed image
+for this build and board. How it is offered, installed and proved:
+[`firmware-ota.md`](firmware-ota.md).
 
 ## Pairing
 
