@@ -261,8 +261,11 @@ class AdvertTimer : public NimBLEScanCallbacks {
   }
 
  private:
-  static constexpr size_t kMax = 400;
-  static constexpr size_t kTracks = 8;
+  // 15s of adverts every ~100ms is 150. A busy home has dozens of connectable
+  // devices on the air, and the scanner is not always among the first heard:
+  // with 8 tracks, a third of its windows went untimed.
+  static constexpr size_t kMax = 200;
+  static constexpr size_t kTracks = 32;
   struct Track {
     NimBLEAddress address;
     uint32_t stamps[kMax];
