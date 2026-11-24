@@ -65,9 +65,12 @@ export const authenticateDevice = async (request: Request, rawBody: string): Pro
 };
 
 /**
- * Every device response declares its length. The firmware refuses to read a
- * body without Content-Length (it bounds what it reads before allocating), and
- * Vercel streams a plain Response.json() as chunked.
+ * Every device response declares its length -- but on Vercel that does not
+ * reach the device: functions are streamed, and the platform sends the body
+ * chunked whatever Content-Length the function set (measured on the board,
+ * 2026-11-24). The firmware therefore reads both framings and bounds the body
+ * itself (BoundedBody for replies, the offered size for firmware images). The
+ * header is still set for any host that does pass it through.
  */
 export const json = (body: unknown, status = 200): Response => {
   const text = JSON.stringify(body);
