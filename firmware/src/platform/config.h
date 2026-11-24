@@ -144,6 +144,9 @@ static_assert(scancartHostIsHttps(SCANCART_HOST),
 #define SCANNER_RESTART_MAX_BACKOFF_S 300
 
 #define HEALTH_SAMPLE_INTERVAL_MS 10000
+// One "[power]" line per window (platform/Power.h): what the cores, the radio
+// and the heap were doing. Five minutes smooths over single requests.
+#define POWER_REPORT_INTERVAL_MS 300000
 #define HEALTH_WARN_INTERVAL_MS 300000
 #define HEAP_CRITICAL_BYTES 40000
 #define HEAP_MIN_BLOCK_BYTES 16000

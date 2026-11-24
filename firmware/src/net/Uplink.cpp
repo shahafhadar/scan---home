@@ -16,6 +16,7 @@
 #include "ota/Ota.h"
 #include "platform/Health.h"
 #include "platform/Log.h"
+#include "platform/Power.h"
 #include "net/BoundedBody.h"
 #include "platform/certs.h"
 #include "platform/config.h"
@@ -129,12 +130,15 @@ int request(const char *method, const char *path, const String &body, String &re
   http.addHeader("Content-Type", "application/json");
   Uplink::sign(http, body);
 
+  const uint32_t startedAt = millis();
   const int status = strcmp(method, "GET") == 0 ? http.GET() : http.POST(body);
   if (status > 0 && !readBounded(http, responseOut)) {
     http.end();
+    Power::noteRequest(millis() - startedAt);
     return -1;
   }
   http.end();
+  Power::noteRequest(millis() - startedAt);
   return status;
 }
 

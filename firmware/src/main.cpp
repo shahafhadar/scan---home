@@ -36,6 +36,7 @@
 #include "platform/ErrorCodes.h"
 #include "platform/Health.h"
 #include "platform/Log.h"
+#include "platform/Power.h"
 #include "platform/Validate.h"
 #include "platform/config.h"
 
@@ -141,7 +142,23 @@ void pump() {
   Feedback::tick();
   Provisioning::tick();
   Health::tick();
+  Power::tick();
   handleFactoryReset();
+}
+
+// The scanner's part of the power line (platform/Power.h).
+void powerProbe(char *out, size_t capacity) {
+#if defined(SCANNER_BLE)
+  uint32_t waiting = 0, linked = 0, total = 0;
+  bleScanner.takeShares(waiting, linked, total);
+  if (total == 0) total = 1;
+  snprintf(out, capacity, "ble wait %u%% listen %u%% linked %u%%",
+           static_cast<unsigned>(waiting * 100ull / total), bleScanner.listenPercent(),
+           static_cast<unsigned>(linked * 100ull / total));
+#else
+  (void)capacity;
+  out[0] = '\0';
+#endif
 }
 
 String makeScanId() {
@@ -476,6 +493,7 @@ void setup() {
   ScanQueue::begin();
   Uplink::begin();
   Ota::begin();
+  Power::begin(powerProbe);
 
   // After storage, because two of the checks need it; before the scanner,
   // because a board that fails these will fail more confusingly later.

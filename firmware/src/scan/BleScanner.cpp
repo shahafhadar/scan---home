@@ -193,8 +193,15 @@ bool BleScanner::connectFresh(const NimBLEAddress &address) {
 }
 
 bool BleScanner::poll(String &barcode) {
-  if (phase_ == Phase::Off) return false;
   const uint32_t now = millis();
+  if (shareAt_ != 0) {
+    const uint32_t elapsed = now - shareAt_;
+    sharedMs_ += elapsed;
+    if (phase_ == Phase::Waiting) waitingMs_ += elapsed;
+    else if (phase_ == Phase::Connected) linkedMs_ += elapsed;
+  }
+  shareAt_ = now;
+  if (phase_ == Phase::Off) return false;
 
   if (bytes_ != loggedBytes_) {
     LOG_D("ble", "received %u bytes", static_cast<unsigned>(bytes_ - loggedBytes_));
@@ -364,6 +371,15 @@ void BleScanner::resume() {
   LOG_I("ble", "resuming bluetooth");
   begin();
 }
+
+void BleScanner::takeShares(uint32_t &waitingMs, uint32_t &linkedMs, uint32_t &totalMs) {
+  waitingMs = waitingMs_;
+  linkedMs = linkedMs_;
+  totalMs = sharedMs_;
+  waitingMs_ = linkedMs_ = sharedMs_ = 0;
+}
+
+unsigned BleScanner::listenPercent() const { return kInitScanWindow * 100u / kInitScanInterval; }
 
 // ---------------------------------------------------------------- storage
 
