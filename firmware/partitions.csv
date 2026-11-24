@@ -1,0 +1,15 @@
+# 16MB flash. Two 4MB app slots so an OTA update can be rolled back to the
+# firmware that was already known to work, plus a filesystem large enough for
+# the offline scan queue and the captive portal assets.
+#
+# The filesystem partition is declared with subtype `spiffs` even though we
+# mount LittleFS on it -- that is the arduino-esp32 convention, and the older
+# partition tool rejects `littlefs` outright. Newer tooling prints a warning
+# about the mismatch; it is expected and harmless.
+# name,     type, subtype,  offset,   size
+nvs,        data, nvs,      0x9000,   0x5000
+otadata,    data, ota,      0xe000,   0x2000
+app0,       app,  ota_0,    0x10000,  0x400000
+app1,       app,  ota_1,    0x410000, 0x400000
+littlefs,   data, spiffs,   0x810000, 0x7E0000
+coredump,   data, coredump, 0xFF0000, 0x10000
