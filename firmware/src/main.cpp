@@ -97,6 +97,38 @@ bool pendingAckFailed_ = false;
 void handleFactoryReset();
 
 /**
+ * Installs an offered update if this is a quiet moment for it (OtaPolicy has
+ * the rules). Bluetooth is shut down for the download -- it holds ~95KB and
+ * half the radio -- and brought back if the attempt fails. On success the
+ * board restarts and this never returns.
+ */
+void maybeUpdate() {
+  OtaPolicy::Moment moment;
+  moment.now = millis();
+  moment.online = WiFi.status() == WL_CONNECTED;
+  moment.onProbation = Ota::onProbation();
+#if defined(SCANNER_BLE)
+  moment.busy = bleScanner.pairing();
+#endif
+  moment.queueEmpty = ScanQueue::isEmpty();
+  moment.scannedSinceBoot = lastBarcode.length() > 0;
+  moment.lastScanAt = lastBarcodeAt;
+  // Mains-powered today. The battery device answers "charging?" here.
+  moment.powerOk = true;
+  moment.freeHeap = Health::freeHeap();
+  if (!Ota::updateDue(moment)) return;
+
+#if defined(SCANNER_BLE)
+  bleScanner.suspend();
+#endif
+  Ota::installOffered();  // returns only on failure
+#if defined(SCANNER_BLE)
+  bleScanner.resume();
+#endif
+  Feedback::setState(ScanQueue::isEmpty() ? Feedback::State::Ready : Feedback::State::Queued);
+}
+
+/**
  * Everything that has to keep running while the firmware is waiting on
  * something slow. Connecting to WiFi and syncing the clock each block for
  * many seconds, and during those the LED must keep animating, the setup page
@@ -347,15 +379,6 @@ void handleCommand(const String &command) {
     SafeMode::expectRestart();
     delay(200);
     ESP.restart();
-
-  } else if (strcmp(action, "ota") == 0) {
-    const char *url = doc["url"] | "";
-    const char *version = doc["version"] | "";
-    if (strlen(url) == 0) {
-      LOG_W("cmd", Err::OtaFailed, "ota command without a url");
-      return;
-    }
-    Ota::applyUpdate(String(url), String(version));
 
 #if defined(SCANNER_BLE)
   } else if (strcmp(action, "pair_scanner") == 0) {
@@ -666,6 +689,8 @@ void loop() {
           handleCommand(command);
         }
       }
+
+      maybeUpdate();
       break;
   }
 
