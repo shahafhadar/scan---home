@@ -22,5 +22,6 @@ build_and_run test_hidkeymap test/test_hidkeymap.cpp src/scan/HidKeymap.cpp
 build_and_run test_validate  test/test_validate.cpp  src/platform/Validate.cpp
 build_and_run test_boundedbody test/test_boundedbody.cpp
 build_and_run test_lineassembler test/test_lineassembler.cpp src/scan/LineAssembler.cpp
+build_and_run test_otapolicy test/test_otapolicy.cpp src/ota/OtaPolicy.cpp
 
 exit $status

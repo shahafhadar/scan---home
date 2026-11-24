@@ -16,6 +16,7 @@
 #include "ota/Ota.h"
 #include "platform/Health.h"
 #include "platform/Log.h"
+#include "platform/Power.h"
 #include "net/BoundedBody.h"
 #include "platform/certs.h"
 #include "platform/config.h"
@@ -26,17 +27,6 @@ namespace {
 // bring-up against a laptop on the same network. A shipped device talks to an
 // https host and therefore verifies its certificate.
 bool insecureHost() { return String(SCANCART_HOST).startsWith("http://"); }
-
-/**
- * The right client for the host we were built against. Kept in one place so
- * no call site has to know or care which it got.
- */
-std::unique_ptr<WiFiClient> makeClient() {
-  if (insecureHost()) return std::unique_ptr<WiFiClient>(new WiFiClient());
-  auto secure = std::unique_ptr<WiFiClientSecure>(new WiFiClientSecure());
-  secure->setCACert(CA_BUNDLE);
-  return std::unique_ptr<WiFiClient>(secure.release());
-}
 
 String hmacSha256(const String &key, const String &message) {
   uint8_t result[32];
@@ -130,34 +120,48 @@ bool readBounded(HTTPClient &http, String &out) {
  * verification on the server.
  */
 int request(const char *method, const char *path, const String &body, String &responseOut) {
-  auto client = makeClient();
+  auto client = Uplink::newClient();
   client->setTimeout(HTTP_TIMEOUT_MS / 1000);
 
   HTTPClient http;
   http.setTimeout(HTTP_TIMEOUT_MS);
   if (!http.begin(*client, String(SCANCART_HOST) + path)) return -1;
 
-  const String timestamp = String(static_cast<uint32_t>(time(nullptr)));
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("X-Device-Id", DeviceIdentity::serial());
-  http.addHeader("X-Timestamp", timestamp);
-  http.addHeader("X-Signature", hmacSha256(DeviceIdentity::secretHash(), timestamp + "." + body));
-#ifdef SCANCART_BYPASS
-  http.addHeader("x-vercel-protection-bypass", SCANCART_BYPASS);
-#endif
+  Uplink::sign(http, body);
 
+  const uint32_t startedAt = millis();
   const int status = strcmp(method, "GET") == 0 ? http.GET() : http.POST(body);
   if (status > 0 && !readBounded(http, responseOut)) {
     http.end();
+    Power::noteRequest(millis() - startedAt);
     return -1;
   }
   http.end();
+  Power::noteRequest(millis() - startedAt);
   return status;
 }
 
 }  // namespace
 
 namespace Uplink {
+
+std::unique_ptr<WiFiClient> newClient() {
+  if (insecureHost()) return std::unique_ptr<WiFiClient>(new WiFiClient());
+  auto secure = std::unique_ptr<WiFiClientSecure>(new WiFiClientSecure());
+  secure->setCACert(CA_BUNDLE);
+  return std::unique_ptr<WiFiClient>(secure.release());
+}
+
+void sign(HTTPClient &http, const String &body) {
+  const String timestamp = String(static_cast<uint32_t>(time(nullptr)));
+  http.addHeader("X-Device-Id", DeviceIdentity::serial());
+  http.addHeader("X-Timestamp", timestamp);
+  http.addHeader("X-Signature", hmacSha256(DeviceIdentity::secretHash(), timestamp + "." + body));
+#ifdef SCANCART_BYPASS
+  http.addHeader("x-vercel-protection-bypass", SCANCART_BYPASS);
+#endif
+}
 
 void begin() {
   if (insecureHost()) {
@@ -181,7 +185,7 @@ bool registerDevice(const String &claimToken, String &pairingCodeOut, bool &clai
   // Registration is the one unsigned call: the server has no key for this
   // device yet. It is rate limited, and an unclaimed device can do nothing
   // until a signed-in person types its pairing code.
-  auto client = makeClient();
+  auto client = newClient();
   HTTPClient http;
   http.setTimeout(HTTP_TIMEOUT_MS);
   if (!http.begin(*client, String(SCANCART_HOST) + "/api/v1/devices/register")) return false;
@@ -324,6 +328,12 @@ size_t flushQueue() {
 
 bool heartbeat(bool scannerAttached, uint32_t keysSeen, String &commandOut,
                const String &ackId, bool ackFailed) {
+#if defined(SCANCART_OTA_ROLLBACK_TEST)
+  // The deliberately broken image (config.h): it never reaches the server, so
+  // it never passes probation, and the board must roll back on its own.
+  LOG_W("net", Err::ServerUnreachable, "rollback-test image: heartbeat withheld on purpose");
+  return false;
+#endif
   JsonDocument doc;
   doc["fw"] = FIRMWARE_VERSION;
   doc["rssi"] = WiFi.RSSI();
@@ -345,6 +355,15 @@ bool heartbeat(bool scannerAttached, uint32_t keysSeen, String &commandOut,
   // reporting three failed boots is a device about to become a support call.
   doc["failed_boots"] = SafeMode::failedBoots();
   doc["ota_probation"] = Ota::onProbation();
+  // Which image this is and where its updating stands. `build` is what the
+  // server matches offers against; `ota` is what the app shows.
+  doc["build"] = SCANCART_BUILD;
+  const Ota::Status ota = Ota::status();
+  JsonObject otaDoc = doc["ota"].to<JsonObject>();
+  otaDoc["state"] = ota.state;
+  if (ota.target.length() > 0) otaDoc["target"] = ota.target;
+  if (ota.rejected.length() > 0) otaDoc["rejected"] = ota.rejected;
+  if (ota.error.length() > 0) otaDoc["error"] = ota.error;
   doc["free_heap"] = Health::freeHeap();
   doc["min_heap"] = Health::minFreeHeap();
   doc["queue_size"] = ScanQueue::size();
@@ -380,6 +399,17 @@ bool heartbeat(bool scannerAttached, uint32_t keysSeen, String &commandOut,
 
   Health::markServerSync();
   Ota::noteServerContact();
+
+  // The offer is repeated on every beat while it stands. Its absence is also
+  // an answer: the release was pulled, or this board is already up to date.
+  JsonVariantConst update = parsed["update"];
+  if (update.isNull()) {
+    Ota::withdrawOffer();
+  } else {
+    Ota::offer(update["version"] | "", update["path"] | "", update["size"] | 0u,
+               update["sha256"] | "");
+  }
+
   if (!parsed["command"].isNull()) {
     serializeJson(parsed["command"], commandOut);
     LOG_I("net", "heartbeat carried a command (%u bytes)", commandOut.length());

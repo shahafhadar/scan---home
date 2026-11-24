@@ -80,7 +80,7 @@ void BleScanner::onData(const uint8_t *data, size_t length) {
 
 void BleScanner::begin() {
   loadSaved();
-  stream_ = xStreamBufferCreate(kStreamBytes, 1);
+  if (!stream_) stream_ = xStreamBufferCreate(kStreamBytes, 1);
 
   if (!stream_ || !NimBLEDevice::init("scan-home")) {
     LOG_E("ble", Err::ScannerLost, "bluetooth did not start; USB scanning still works");
@@ -193,8 +193,15 @@ bool BleScanner::connectFresh(const NimBLEAddress &address) {
 }
 
 bool BleScanner::poll(String &barcode) {
-  if (phase_ == Phase::Off) return false;
   const uint32_t now = millis();
+  if (shareAt_ != 0) {
+    const uint32_t elapsed = now - shareAt_;
+    sharedMs_ += elapsed;
+    if (phase_ == Phase::Waiting) waitingMs_ += elapsed;
+    else if (phase_ == Phase::Connected) linkedMs_ += elapsed;
+  }
+  shareAt_ = now;
+  if (phase_ == Phase::Off) return false;
 
   if (bytes_ != loggedBytes_) {
     LOG_D("ble", "received %u bytes", static_cast<unsigned>(bytes_ - loggedBytes_));
@@ -223,7 +230,10 @@ bool BleScanner::poll(String &barcode) {
       // Usually the scanner going to sleep. It advertises again when the
       // trigger wakes it, and the standing request is already waiting.
       droppedAt_ = now;
-      LOG_I("ble", "scanner disconnected (%s); waiting for it",
+      // The number as well as the text: NimBLE has no text for the common
+      // ones (0x208, supervision timeout, is the scanner falling asleep).
+      LOG_I("ble", "scanner disconnected (reason 0x%x %s); waiting for it",
+            static_cast<unsigned>(disconnectReason_),
             NimBLEUtils::returnCodeToString(disconnectReason_));
       enterWaiting();
     }
@@ -334,6 +344,42 @@ void BleScanner::forgetScanner() {
   LOG_I("ble", "scanner forgotten");
   enterWaiting();
 }
+
+void BleScanner::suspend() {
+  if (phase_ == Phase::Off) return;
+  LOG_I("ble", "pausing bluetooth (frees its memory and the radio)");
+  if (phase_ == Phase::Pairing) Feedback::setScannerPairing(false);
+  phase_ = Phase::Off;  // first: the scan callback reads it on the BLE task
+  stopScan();
+  disarmReconnect();
+  if (client_ && client_->isConnected()) client_->disconnect();
+  // true: also release the controller's memory, not just the host's. The
+  // client goes with it.
+  NimBLEDevice::deinit(true);
+  client_ = nullptr;
+  connected_ = false;
+  linkUp_ = false;
+  connectFailed_ = false;
+  disconnected_ = false;
+  reconnectArmed_ = false;
+  suspended_ = true;
+}
+
+void BleScanner::resume() {
+  if (!suspended_) return;
+  suspended_ = false;
+  LOG_I("ble", "resuming bluetooth");
+  begin();
+}
+
+void BleScanner::takeShares(uint32_t &waitingMs, uint32_t &linkedMs, uint32_t &totalMs) {
+  waitingMs = waitingMs_;
+  linkedMs = linkedMs_;
+  totalMs = sharedMs_;
+  waitingMs_ = linkedMs_ = sharedMs_ = 0;
+}
+
+unsigned BleScanner::listenPercent() const { return kInitScanWindow * 100u / kInitScanInterval; }
 
 // ---------------------------------------------------------------- storage
 

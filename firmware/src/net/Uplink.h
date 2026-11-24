@@ -1,5 +1,9 @@
 #pragma once
 #include <Arduino.h>
+#include <HTTPClient.h>
+#include <WiFiClient.h>
+
+#include <memory>
 
 #include "data/ScanQueue.h"
 
@@ -20,6 +24,19 @@ struct ScanResult {
 };
 
 void begin();
+
+/**
+ * A client for the host this image was built against: TLS checked against our
+ * CA bundle, or plain only for a bring-up build pointed at a laptop.
+ */
+std::unique_ptr<WiFiClient> newClient();
+
+/**
+ * Adds the device's signature to a request: serial, timestamp, and an HMAC
+ * over `timestamp.body`. `body` must be exactly the bytes that will be sent
+ * -- empty for a GET.
+ */
+void sign(HTTPClient &http, const String &body);
 
 /**
  * Announces the device. Idempotent.
@@ -54,6 +71,9 @@ size_t flushQueue();
  * reply does not silently drop the acknowledgement. Commands that reboot the
  * board (reboot, factory_reset, reprovision) never reach this -- there is no
  * next heartbeat to carry the ack on.
+ *
+ * The reply may also carry an update offer, which goes straight to Ota; the
+ * beat in turn reports this image's build and where updating stands.
  */
 bool heartbeat(bool scannerAttached, uint32_t keysSeen, String &commandOut,
                const String &ackId = String(), bool ackFailed = false);

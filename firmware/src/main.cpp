@@ -36,6 +36,7 @@
 #include "platform/ErrorCodes.h"
 #include "platform/Health.h"
 #include "platform/Log.h"
+#include "platform/Power.h"
 #include "platform/Validate.h"
 #include "platform/config.h"
 
@@ -97,6 +98,38 @@ bool pendingAckFailed_ = false;
 void handleFactoryReset();
 
 /**
+ * Installs an offered update if this is a quiet moment for it (OtaPolicy has
+ * the rules). Bluetooth is shut down for the download -- it holds ~95KB and
+ * half the radio -- and brought back if the attempt fails. On success the
+ * board restarts and this never returns.
+ */
+void maybeUpdate() {
+  OtaPolicy::Moment moment;
+  moment.now = millis();
+  moment.online = WiFi.status() == WL_CONNECTED;
+  moment.onProbation = Ota::onProbation();
+#if defined(SCANNER_BLE)
+  moment.busy = bleScanner.pairing();
+#endif
+  moment.queueEmpty = ScanQueue::isEmpty();
+  moment.scannedSinceBoot = lastBarcode.length() > 0;
+  moment.lastScanAt = lastBarcodeAt;
+  // Mains-powered today. The battery device answers "charging?" here.
+  moment.powerOk = true;
+  moment.freeHeap = Health::freeHeap();
+  if (!Ota::updateDue(moment)) return;
+
+#if defined(SCANNER_BLE)
+  bleScanner.suspend();
+#endif
+  Ota::installOffered();  // returns only on failure
+#if defined(SCANNER_BLE)
+  bleScanner.resume();
+#endif
+  Feedback::setState(ScanQueue::isEmpty() ? Feedback::State::Ready : Feedback::State::Queued);
+}
+
+/**
  * Everything that has to keep running while the firmware is waiting on
  * something slow. Connecting to WiFi and syncing the clock each block for
  * many seconds, and during those the LED must keep animating, the setup page
@@ -109,7 +142,23 @@ void pump() {
   Feedback::tick();
   Provisioning::tick();
   Health::tick();
+  Power::tick();
   handleFactoryReset();
+}
+
+// The scanner's part of the power line (platform/Power.h).
+void powerProbe(char *out, size_t capacity) {
+#if defined(SCANNER_BLE)
+  uint32_t waiting = 0, linked = 0, total = 0;
+  bleScanner.takeShares(waiting, linked, total);
+  if (total == 0) total = 1;
+  snprintf(out, capacity, "ble wait %u%% listen %u%% linked %u%%",
+           static_cast<unsigned>(waiting * 100ull / total), bleScanner.listenPercent(),
+           static_cast<unsigned>(linked * 100ull / total));
+#else
+  (void)capacity;
+  out[0] = '\0';
+#endif
 }
 
 String makeScanId() {
@@ -348,15 +397,6 @@ void handleCommand(const String &command) {
     delay(200);
     ESP.restart();
 
-  } else if (strcmp(action, "ota") == 0) {
-    const char *url = doc["url"] | "";
-    const char *version = doc["version"] | "";
-    if (strlen(url) == 0) {
-      LOG_W("cmd", Err::OtaFailed, "ota command without a url");
-      return;
-    }
-    Ota::applyUpdate(String(url), String(version));
-
 #if defined(SCANNER_BLE)
   } else if (strcmp(action, "pair_scanner") == 0) {
     // Same as releasing BOOT after 3s: listen for a scanner for a minute. The
@@ -453,6 +493,7 @@ void setup() {
   ScanQueue::begin();
   Uplink::begin();
   Ota::begin();
+  Power::begin(powerProbe);
 
   // After storage, because two of the checks need it; before the scanner,
   // because a board that fails these will fail more confusingly later.
@@ -666,6 +707,8 @@ void loop() {
           handleCommand(command);
         }
       }
+
+      maybeUpdate();
       break;
   }
 

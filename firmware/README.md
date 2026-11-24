@@ -81,7 +81,7 @@ src/
 ├─ device/     DeviceIdentity · Provisioning
 ├─ scan/       ScanSource · UsbHidScanner · UartScanner · SerialScanner · HidKeymap
 ├─ data/       ScanQueue
-├─ ota/        Ota · Signature · ota_public_key
+├─ ota/        Ota · OtaPolicy · Signature · ota_public_key
 ├─ hmi/        Feedback
 └─ main.cpp    רק חיווט ומכונת המצבים
 ```
@@ -98,7 +98,7 @@ src/
 | `device/` | זהות, סוד, Captive Portal |
 | `scan/` | שלושה מקורות סריקה מאחורי ממשק אחד, ופענוח USB HID |
 | `data/` | תור על LittleFS ששורד ניתוק חשמל |
-| `ota/` | עדכונים חתומים וחלון ה-probation |
+| `ota/` | עדכונים חתומים: מתי מתקינים (`OtaPolicy`), הורדה ובדיקה, חלון ה-probation |
 | `hmi/` | נורית ובאזר |
 
 `platform/config.h` מחזיק **כל** קבוע. שום מודול אחר לא מקודד פין, כתובת או timeout.
@@ -136,9 +136,13 @@ conditions, וזה סוג הבאג שמופיע אצל לקוח פעם בשבו�
 ## עדכונים חתומים
 
 ```bash
-tools/ota-keygen.sh                        # פעם אחת בחיים
-tools/ota-release.sh usb SC-XXXXXXXX       # בנייה, חתימה, פרסום, ושליחה
+tools/ota-keygen.sh            # פעם אחת בחיים; מסרב להחליף מפתח קיים
+tools/ota-release.sh usb       # בנייה, בדיקת המפתח, חתימה, העלאה כ-draft
 ```
+
+מכשירים מתעדכנים לבד: כל heartbeat יכול להחזיר הצעה לגרסה חדשה, והמכשיר
+מתקין אותה ברגע שקט. איך משחררים, מפרסמים ומטפלים בתקלה:
+[`docs/firmware-ota.md`](../docs/firmware-ota.md).
 
 המפתח הפרטי חי מחוץ למאגר, ב־`~/.scancart-signing/`. הציבורי מוטמע בקושחה
 ב־`ota_public_key.h`. מכשיר מתקין אימג' כי הוא נושא חתימה שרק המפתח הפרטי

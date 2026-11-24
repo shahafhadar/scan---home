@@ -56,6 +56,23 @@ class BleScanner : public ScanSource {
 
   /** Forgets the remembered scanner and drops the connection. */
   void forgetScanner();
+
+  /**
+   * Shuts Bluetooth down completely: link, standing request, controller and
+   * host. Frees the ~95KB the stack holds and gives WiFi the whole radio --
+   * what a firmware download needs. The remembered scanner is kept.
+   */
+  void suspend();
+  /** Starts Bluetooth again after suspend(). Reconnects to the same scanner. */
+  void resume();
+
+  /**
+   * Time spent waiting for the scanner and linked to it since the last call,
+   * out of `totalMs`. Resets. For the power report.
+   */
+  void takeShares(uint32_t &waitingMs, uint32_t &linkedMs, uint32_t &totalMs);
+  /** While waiting, the share of time the radio actually listens. */
+  unsigned listenPercent() const;
   /** Clears the stored scanner without touching the radio. Factory reset. */
   static void eraseStored();
 
@@ -122,6 +139,11 @@ class BleScanner : public ScanSource {
   volatile uint32_t linkUpAt_ = 0;
 
   bool reconnectArmed_ = false;
+  bool suspended_ = false;
+  uint32_t shareAt_ = 0;
+  uint32_t waitingMs_ = 0;
+  uint32_t linkedMs_ = 0;
+  uint32_t sharedMs_ = 0;
   bool refreshAttributes_ = false;  // rediscover on the next connect (cache suspect)
   volatile bool connected_ = false;
   volatile uint32_t bytes_ = 0;

@@ -18,7 +18,20 @@
 #define SCANCART_HOST "https://api.scancart.example"
 #endif
 
-#define FIRMWARE_VERSION "1.2.0"
+#define FIRMWARE_VERSION "1.3.0"
+
+// The `otatest` build: an image that boots normally but never completes a
+// heartbeat, so it can never pass probation and the board has to roll itself
+// back. It is how the safety net is proved on real hardware, and it carries a
+// version of its own so it can be offered over the real one. Never shipped.
+#if defined(SCANCART_OTA_ROLLBACK_TEST)
+#if defined(SCANCART_PRODUCTION)
+#error "the rollback-test image must never be a production build"
+#endif
+#undef FIRMWARE_VERSION
+#define FIRMWARE_VERSION_ROLLBACK_TEST "1.3.90"
+#define FIRMWARE_VERSION FIRMWARE_VERSION_ROLLBACK_TEST
+#endif
 
 // The board this build expects. Reported in the heartbeat and in diagnostics,
 // because the first question about any field fault is "which one is it?" --
@@ -131,6 +144,9 @@ static_assert(scancartHostIsHttps(SCANCART_HOST),
 #define SCANNER_RESTART_MAX_BACKOFF_S 300
 
 #define HEALTH_SAMPLE_INTERVAL_MS 10000
+// One "[power]" line per window (platform/Power.h): what the cores, the radio
+// and the heap were doing. Five minutes smooths over single requests.
+#define POWER_REPORT_INTERVAL_MS 300000
 #define HEALTH_WARN_INTERVAL_MS 300000
 #define HEAP_CRITICAL_BYTES 40000
 #define HEAP_MIN_BLOCK_BYTES 16000
@@ -161,10 +177,40 @@ static_assert(scancartHostIsHttps(SCANCART_HOST),
 // for someone to notice.
 #define OTA_PROBATION_GIVEUP_MS 900000
 
-// No bytes for this long during a download and we stop waiting. Separate from
-// the HTTP timeout, which only covers the connection, not a stream that opens
-// and then goes quiet.
-#define OTA_STALL_TIMEOUT_MS 30000
+// One read of a firmware download may wait this long for bytes -- covers a
+// stream that opens and then goes quiet, not only the connection. Under the
+// watchdog's 30s, so a stalled server ends the attempt instead of the board.
+#define OTA_HTTP_TIMEOUT_MS 20000
+
+// The size of one application slot (partitions.csv). An offer bigger than this
+// cannot be installed, so it is refused before a byte is downloaded.
+#define OTA_SLOT_BYTES 0x400000u
+
+// Updates install by themselves, but only into a quiet moment: this long since
+// the last scan. Long enough that someone unpacking shopping is not cut off
+// mid-bag, short enough that a device on a counter updates within the hour.
+#define OTA_QUIET_AFTER_SCAN_MS 120000u
+
+// After a failed attempt: wait this long, then this, then this for every
+// attempt after. A broken release must not keep the radio busy all day.
+#define OTA_RETRY_FIRST_MS 120000u
+#define OTA_RETRY_SECOND_MS 600000u
+#define OTA_RETRY_LONG_MS 21600000u
+
+// Which build this image is. The server only offers an image built the same
+// way: a UART-scanner board must never be handed the USB build, and a
+// development board must never be handed production's.
+#ifndef SCANCART_BUILD
+#if defined(SCANCART_PRODUCTION)
+#define SCANCART_BUILD "production"
+#elif defined(SCANNER_USB_HID)
+#define SCANCART_BUILD "usb"
+#elif defined(SCANNER_UART)
+#define SCANCART_BUILD "uart"
+#else
+#define SCANCART_BUILD "serial"
+#endif
+#endif
 
 // ---------------------------------------------------------------- limits
 // The most we will read from a server response. Every reply we expect is a few
