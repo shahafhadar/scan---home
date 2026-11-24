@@ -194,6 +194,89 @@ void probe(const NimBLEAdvertisedDevice *device, bool listen) {
   NimBLEDevice::deleteClient(client);
 }
 
+/**
+ * How often the scanner advertises while it is awake and unconnected. This is
+ * what sets how little the product firmware can afford to listen: with an
+ * advert every A ms, a scan window a little longer than A catches it in the
+ * first window, so the radio can sleep the rest of the interval without
+ * slowing the reconnect.
+ *
+ * Tracked by address, not by looks: the HBA-W7 puts its name and service in
+ * the scan response, so its plain adverts -- the ones being timed -- carry
+ * nothing to recognise it by. The scanner is picked out after the scan, and
+ * its address's timestamps are printed.
+ *
+ * Build with -DBLESCAN_TIMING_ONLY (PLATFORMIO_BUILD_FLAGS) to only measure:
+ * no connection, so a woken scanner keeps advertising until it sleeps again.
+ */
+class AdvertTimer : public NimBLEScanCallbacks {
+ public:
+  // With duplicates on, NimBLE calls this once per advertisement (scan
+  // responses excluded).
+  void onDiscovered(const NimBLEAdvertisedDevice *device) override {
+    if (!device->isConnectable()) return;
+    const uint32_t now = millis();
+    for (size_t i = 0; i < used_; i++) {
+      if (tracks_[i].address == device->getAddress()) {
+        if (tracks_[i].count < kMax) tracks_[i].stamps[tracks_[i].count++] = now;
+        return;
+      }
+    }
+    if (used_ < kTracks) {
+      tracks_[used_].address = device->getAddress();
+      tracks_[used_].stamps[0] = now;
+      tracks_[used_].count = 1;
+      used_++;
+    }
+  }
+  void reset() { used_ = 0; }
+  void print(const NimBLEAddress &address) const {
+    for (size_t t = 0; t < used_; t++) {
+      const Track &track = tracks_[t];
+      if (!(track.address == address)) continue;
+      if (track.count < 3) {
+        Serial.printf("advert timing: only %u adverts seen\n", static_cast<unsigned>(track.count));
+        return;
+      }
+      static uint32_t gaps[kMax];
+      size_t n = 0;
+      for (size_t i = 1; i < track.count; i++) gaps[n++] = track.stamps[i] - track.stamps[i - 1];
+      // Median, not mean: a missed advert doubles one gap.
+      for (size_t i = 1; i < n; i++) {
+        for (size_t j = i; j > 0 && gaps[j - 1] > gaps[j]; j--) {
+          const uint32_t g = gaps[j];
+          gaps[j] = gaps[j - 1];
+          gaps[j - 1] = g;
+        }
+      }
+      Serial.printf("advert timing: %u adverts over %u ms, gap min %u / p25 %u / median %u / p90 %u / max %u ms\n",
+                    static_cast<unsigned>(track.count),
+                    static_cast<unsigned>(track.stamps[track.count - 1] - track.stamps[0]),
+                    static_cast<unsigned>(gaps[0]), static_cast<unsigned>(gaps[n / 4]),
+                    static_cast<unsigned>(gaps[n / 2]), static_cast<unsigned>(gaps[(n * 9) / 10]),
+                    static_cast<unsigned>(gaps[n - 1]));
+      return;
+    }
+    Serial.println("advert timing: no adverts tracked for the scanner");
+  }
+
+ private:
+  // 15s of adverts every ~100ms is 150. A busy home has dozens of connectable
+  // devices on the air, and the scanner is not always among the first heard:
+  // with 8 tracks, a third of its windows went untimed.
+  static constexpr size_t kMax = 200;
+  static constexpr size_t kTracks = 32;
+  struct Track {
+    NimBLEAddress address;
+    uint32_t stamps[kMax];
+    size_t count = 0;
+  };
+  Track tracks_[kTracks];
+  size_t used_ = 0;
+};
+
+AdvertTimer advertTimer;
+
 }  // namespace
 
 void setup() {
@@ -214,9 +297,16 @@ void loop() {
   scan->setActiveScan(true);
   scan->setInterval(100);
   scan->setWindow(99);
+  scan->setScanCallbacks(&advertTimer, true);  // every advert, for the timing
+  advertTimer.reset();
 
-  Serial.println("--- scanning 6s ---");
-  NimBLEScanResults found = scan->getResults(6000, false);  // blocking, ms
+#if defined(BLESCAN_TIMING_ONLY)
+  constexpr uint32_t kScanMs = 15000;  // a whole wake, not just its start
+#else
+  constexpr uint32_t kScanMs = 6000;
+#endif
+  Serial.printf("--- scanning %us ---\n", static_cast<unsigned>(kScanMs / 1000));
+  NimBLEScanResults found = scan->getResults(kScanMs, false);  // blocking, ms
 
   int best = -1;
   for (int i = 0; i < found.getCount(); i++) {
@@ -231,7 +321,10 @@ void loop() {
   }
 
   if (best >= 0) {
+    advertTimer.print(found.getDevice(best)->getAddress());
+#if !defined(BLESCAN_TIMING_ONLY)
     probe(found.getDevice(best), true);
+#endif
   } else {
     // Only list. Connecting to whatever else is in range (locks, speakers,
     // the TV) proves nothing about the scanner and is not ours to poke at.

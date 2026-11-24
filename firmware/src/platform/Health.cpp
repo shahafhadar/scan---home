@@ -17,6 +17,7 @@ uint32_t lastServerSyncMs = 0;
 bool everSynced = false;
 
 uint32_t heapAtBoot = 0;
+uint32_t heapSettled = 0;
 uint32_t lastSampleMs = 0;
 uint32_t lastWarnMs = 0;
 
@@ -52,6 +53,12 @@ void countError(Err error) {
 void countWifiReconnect() { wifiReconnectCount++; }
 void countUsbRestart() { usbRestartCount++; }
 
+void settled() {
+  if (heapSettled != 0) return;
+  heapSettled = ESP.getFreeHeap();
+  LOG_I("health", "free heap once settled: %u bytes (boot was %u)", heapSettled, heapAtBoot);
+}
+
 void markServerSync() {
   lastServerSyncMs = millis();
   everSynced = true;
@@ -82,9 +89,15 @@ uint32_t secondsSinceServerSync() {
 
 bool memoryLooksUnhealthy() {
   // Two separate signals. An absolute floor catches running out; a fall from
-  // the boot figure catches a slow leak that has not bitten yet but will.
+  // the settled figure catches a slow leak that has not bitten yet but will.
+  //
+  // Settled, not boot: the boot figure is taken before WiFi, Bluetooth and
+  // TLS have allocated anything, so a perfectly healthy device sits below
+  // half of it all day -- which made this warning fire every five minutes on
+  // every board and meant nothing. And free, not minimum: the minimum is the
+  // deepest dip of any TLS handshake ever, which the floor already judges.
   if (minFreeHeap() < HEAP_CRITICAL_BYTES) return true;
-  if (heapAtBoot > 0 && minFreeHeap() < heapAtBoot / 2) return true;
+  if (heapSettled > 0 && freeHeap() < heapSettled / 2) return true;
   // Plenty free overall but no single block worth having is fragmentation,
   // and it fails allocations that the free total says should succeed.
   return largestFreeBlock() < HEAP_MIN_BLOCK_BYTES;

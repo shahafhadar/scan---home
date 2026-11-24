@@ -30,13 +30,21 @@ constexpr uint32_t kPickNearestMs = 1500;
 // Connection parameters, in BLE units. 15-30ms interval: quick to subscribe
 // and to deliver a barcode, without hogging the radio WiFi shares. 4s
 // supervision timeout, so a burst of WiFi traffic is not mistaken for a lost
-// link. While the request is pending the controller listens 10ms of every
-// 20ms for the scanner's advert -- half the radio, the rest is WiFi's.
+// link.
+//
+// While the request is pending -- which is most of the day, the scanner asleep
+// -- the controller listens for the scanner's advert. A woken HBA-W7
+// advertises every 97-110ms (median 105, measured with tools/blescan) for a
+// minute or more. A 120ms window is longer than that gap, so any window that
+// opens while the scanner is awake catches it; the radio then rests the other
+// 360ms. A quarter of the radio instead of half, and the reconnect stays
+// bounded: at worst a wake just misses a window, 360ms to the next plus up to
+// 110ms inside it. The old 10ms-of-20ms caught each advert only by chance.
 constexpr uint16_t kConnIntervalMin = 12;  // x1.25ms
 constexpr uint16_t kConnIntervalMax = 24;
 constexpr uint16_t kSupervisionTimeout = 400;  // x10ms
-constexpr uint16_t kInitScanInterval = 32;     // x0.625ms
-constexpr uint16_t kInitScanWindow = 16;
+constexpr uint16_t kInitScanInterval = 768;    // x0.625ms = 480ms
+constexpr uint16_t kInitScanWindow = 192;      // 120ms
 
 }  // namespace
 

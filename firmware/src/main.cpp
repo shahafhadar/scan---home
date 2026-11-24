@@ -505,6 +505,14 @@ void setup() {
 }
 
 void loop() {
+  // Rest first. Arduino calls loop() back to back with no pause, so without
+  // this the core spun at 100% at 240MHz all day doing nothing -- the single
+  // largest draw on the board. A short sleep lets the idle task clock-gate the
+  // core (WAITI) between iterations. Nothing here needs to be faster: the USB
+  // host and Bluetooth run on their own tasks and buffer what arrives, and the
+  // LED and buzzer are timed in tens of milliseconds.
+  vTaskDelay(pdMS_TO_TICKS(LOOP_IDLE_MS));
+
   // pump() is also called from inside every long wait, so these run whether
   // the firmware is idle or halfway through connecting.
   pump();
@@ -512,7 +520,10 @@ void loop() {
   // A boot counts as healthy once it has been up a while and has reached the
   // server. Not at the end of setup(): firmware that crashes two minutes in
   // would clear the counter every time and never reach safe mode.
-  if (claimed && millis() > HEALTHY_AFTER_MS) SafeMode::markHealthy();
+  if (claimed && millis() > HEALTHY_AFTER_MS) {
+    SafeMode::markHealthy();
+    Health::settled();
+  }
 
   // Confirms a new image once it has proved itself, or rolls the device back
   // if it never does. Runs before the state machine so a firmware that hangs
