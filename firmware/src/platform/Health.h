@@ -23,6 +23,13 @@ void countWifiReconnect();
 void countUsbRestart();
 void markServerSync();
 
+/**
+ * Takes the leak baseline: free heap once the radios and the TLS stack have
+ * taken their share. Call once the device has settled (it is idempotent).
+ * Until then only the absolute floor and fragmentation are judged.
+ */
+void settled();
+
 uint32_t freeHeap();
 uint32_t minFreeHeap();      // the lowest ever seen -- the leak indicator
 uint32_t largestFreeBlock(); // fragmentation: can fall while freeHeap looks fine
