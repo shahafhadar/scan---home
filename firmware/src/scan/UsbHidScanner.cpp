@@ -26,6 +26,18 @@ void UsbHidScanner::begin() {
     LOG_W("usb", Err::ScannerLost, "scanner removed");
   });
 
+  // A powered USB hub between the board and the dongle is one way to give the
+  // dongle real 5V (the board's own USB-OTG port does not supply VBUS -- see
+  // the class comment). With hub tracking on, EspUsbHost opens the hub as a
+  // device of its own and fires onDeviceConnected for it, which would set
+  // attached_ -- "scanner attached" with no scanner, just a hub. Off, the
+  // library leaves the hub to ESP-IDF's hub driver: devices behind it still
+  // enumerate, and only they reach the callbacks above. This does not avoid
+  // the hub-driver crash EspUsbHost documents for one hub/device combination
+  // (that happens with tracking off too). Set before the first begin(), so
+  // restartHostIfMissing() keeps the same setting.
+  host_.setHubTrackingEnabled(false);
+
   lastSeenAt_ = millis();
   if (!host_.begin()) {
     LOG_E("usb", Err::ScannerLost, "host failed to start");
